@@ -13,6 +13,16 @@ Every chart below is built against the dataviz skill's checklist: the color job
 is, marks are thin with rounded bar ends and >=8px ringed line markers, bars carry
 direct value-at-tip labels, hover tooltips lead with the value, and each tab keeps
 a plain-table twin so nothing is gated behind a hover.
+
+Responsive behaviour is split across three layers, deliberately:
+
+* ``assets/style.css`` — CSS media queries own the page layout, type scale and
+  tap targets. This layer works with JavaScript disabled.
+* ``assets/environment.js`` — measures the live browser (viewport tier, pointer
+  type, engine, feature support) and reports it into ``env-store``.
+* ``responsive.py`` — turns that report into a :class:`ViewProfile` that the tab
+  renderers below consult for the things CSS cannot reach: Plotly axis margins,
+  tick-label truncation, drag behaviour on touch, table page size.
 """
 
 from __future__ import annotations
@@ -32,6 +42,13 @@ from data_prep import (
     REGION_ORDER,
     SEGMENT_ORDER,
     load_data,
+)
+from responsive import (
+    CHART_COL,
+    ViewProfile,
+    graph_config,
+    profile_from_store,
+    responsive_figure,
 )
 from viz_theme import (
     CATEGORICAL,
@@ -58,6 +75,16 @@ C_REVENUE = CATEGORICAL[0]      # blue
 C_COST = CATEGORICAL[1]         # orange
 C_PROFIT = CATEGORICAL[5]       # green
 C_FRICTION = CATEGORICAL[6]     # violet — returns/friction, deliberately not status-red
+
+# Short codes for the promotion scatter's point labels at phone width, where the
+# full names collide. The full names stay in the hover and in the table below.
+PROMO_SHORT_LABEL = {
+    "No Promotion": "None",
+    "Category Offer": "Category",
+    "Member Offer": "Member",
+    "Festival Sale": "Festival",
+    "Flash Deal": "Flash",
+}
 
 # --------------------------------------------------------------------------- data
 DF = load_data()
@@ -134,21 +161,58 @@ def apply_filters(df: pd.DataFrame, start_date, end_date, regions, categories, s
     return df.loc[mask]
 
 
-def table_view(df: pd.DataFrame, columns: list[str], title: str) -> html.Div:
-    """A plain data table beneath the charts — the WCAG-clean twin of every chart above it."""
+def graph(fig, view: ViewProfile) -> dcc.Graph:
+    """Wrap a finished figure for the current viewport.
+
+    ``responsive=True`` lets Plotly re-fit the chart in the browser on rotation
+    or a window drag without a server round-trip; :func:`responsive_figure`
+    handles the parts that must be decided server-side (margins, tick labels,
+    drag behaviour on touch).
+
+    Sizing is handed entirely to the container: the computed height goes on the
+    wrapper (which style.css frames with `content-box`, so the border and padding
+    add *around* it) and ``layout.height`` is cleared. Leaving both set makes
+    Plotly draw an SVG at the full height inside a shorter padded content box,
+    which clips the x-axis title off the bottom of every chart; clearing both
+    makes it fall back to its own 450px default.
+    """
+    fig = responsive_figure(fig, view)
+    height = int(fig.layout.height or 340)
+    fig.update_layout(height=None, width=None, autosize=True)
+    # Height only — style.css owns the width, because it has to subtract the
+    # frame that its `content-box` sizing adds around the plot.
+    return dcc.Graph(
+        figure=fig,
+        config=graph_config(view),
+        responsive=True,
+        style={"height": f"{height}px"},
+    )
+
+
+def table_view(df: pd.DataFrame, columns: list[str], title: str, view: ViewProfile) -> html.Div:
+    """A plain data table beneath the charts — the WCAG-clean twin of every chart above it.
+
+    On a phone this is also where the full text lives for anything the chart had
+    to shorten (truncated category ticks), so nothing is lost to small screens.
+    """
     return html.Div(
         [
             html.Div(title, className="table-title"),
             dash_table.DataTable(
                 data=df[columns].round(2).to_dict("records"),
                 columns=[{"name": c.replace("_", " "), "id": c} for c in columns],
-                style_table={"overflowX": "auto"},
-                style_cell={"fontFamily": "system-ui, sans-serif", "fontSize": 13, "padding": "6px 10px",
+                # Wide tables scroll inside their own box; the page itself never
+                # scrolls sideways (see body overflow-x in style.css).
+                style_table={"overflowX": "auto", "WebkitOverflowScrolling": "touch"},
+                style_cell={"fontFamily": "system-ui, sans-serif",
+                            "fontSize": 12 if view.is_narrow else 13,
+                            "padding": "8px 10px" if view.is_touch_primary else "6px 10px",
                             "backgroundColor": SURFACE, "color": INK["primary"], "border": "none",
-                            "borderBottom": f"1px solid {INK['grid']}", "fontVariantNumeric": "tabular-nums"},
+                            "borderBottom": f"1px solid {INK['grid']}", "fontVariantNumeric": "tabular-nums",
+                            "minWidth": "72px", "maxWidth": "200px", "whiteSpace": "normal"},
                 style_header={"fontWeight": 600, "backgroundColor": SURFACE, "color": INK["secondary"],
                               "borderBottom": f"2px solid {INK['axis']}"},
-                page_size=10,
+                page_size=view.table_page_size,
             ),
         ],
         className="table-wrap",
@@ -173,7 +237,7 @@ def _outside_label_range(series: pd.Series, pad: float = 0.22) -> list[float]:
 # --------------------------------------------------------------------------- tab renderers
 
 
-def render_overview(dff: pd.DataFrame) -> html.Div:
+def render_overview(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
     if dff.empty:
         return empty_state()
     valid = dff[dff["Is_Valid_Revenue"]]
@@ -184,19 +248,22 @@ def render_overview(dff: pd.DataFrame) -> html.Div:
     on_time = dff["On_Time_Flag"].mean() * 100
     is_filtered = len(dff) < len(DF)
 
+    # 2-up on phones, 3-up on tablets, 6-up on desktop — the KPI strip stays one
+    # readable block instead of six full-width cards the user has to scroll past.
+    kpi_col = {"xs": 6, "sm": 4, "lg": 2}
     cards = dbc.Row(
         [
-            dbc.Col(stat_card("Net Revenue", format_inr(revenue), C_REVENUE), md=2),
-            dbc.Col(stat_card("Profit", format_inr(profit), C_PROFIT), md=2),
+            dbc.Col(stat_card("Net Revenue", format_inr(revenue), C_REVENUE), **kpi_col),
+            dbc.Col(stat_card("Profit", format_inr(profit), C_PROFIT), **kpi_col),
             dbc.Col(stat_card("Profit Margin", f"{margin:.1f}%",
                                rate_status(margin, 12, 9, lower_is_better=False),
-                               delta=(margin - BASELINE_MARGIN) if is_filtered else None), md=2),
-            dbc.Col(stat_card("Orders", f"{len(dff):,}", CATEGORICAL[3]), md=2),
-            dbc.Col(stat_card("Avg Order Value", format_inr(aov), CATEGORICAL[4]), md=2),
+                               delta=(margin - BASELINE_MARGIN) if is_filtered else None), **kpi_col),
+            dbc.Col(stat_card("Orders", f"{len(dff):,}", CATEGORICAL[3]), **kpi_col),
+            dbc.Col(stat_card("Avg Order Value", format_inr(aov), CATEGORICAL[4]), **kpi_col),
             dbc.Col(stat_card("On-Time Delivery", f"{on_time:.1f}%",
                                rate_status(on_time, 75, 50, lower_is_better=False),
                                delta=(on_time - BASELINE_ON_TIME) if is_filtered else None,
-                               delta_good_if_up=True, delta_suffix=" pts"), md=2),
+                               delta_good_if_up=True, delta_suffix=" pts"), **kpi_col),
         ],
         className="g-3 mb-3",
     )
@@ -281,16 +348,16 @@ def render_overview(dff: pd.DataFrame) -> html.Div:
     return html.Div([
         cards,
         story,
-        dbc.Row([dbc.Col(dcc.Graph(figure=fig_rev, config={"displayModeBar": False}), md=6),
-                 dbc.Col(dcc.Graph(figure=fig_margin, config={"displayModeBar": False}), md=6)], className="g-3"),
-        dbc.Row([dbc.Col(dcc.Graph(figure=fig_cat, config={"displayModeBar": False}), md=6),
-                 dbc.Col(dcc.Graph(figure=fig_reg, config={"displayModeBar": False}), md=6)], className="g-3 mt-1"),
+        dbc.Row([dbc.Col(graph(fig_rev, view), **CHART_COL, className="chart-cell"),
+                 dbc.Col(graph(fig_margin, view), **CHART_COL, className="chart-cell")], className="g-3"),
+        dbc.Row([dbc.Col(graph(fig_cat, view), **CHART_COL, className="chart-cell"),
+                 dbc.Col(graph(fig_reg, view), **CHART_COL, className="chart-cell")], className="g-3 mt-1"),
         table_view(yearly_tbl, ["Year", "Net_Revenue", "Profit", "Margin_Pct", "Orders"],
-                   "Year-over-year revenue & margin (filtered selection)"),
+                   "Year-over-year revenue & margin (filtered selection)", view),
     ])
 
 
-def render_profitability(dff: pd.DataFrame) -> html.Div:
+def render_profitability(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
     if dff.empty:
         return empty_state()
     valid = dff[dff["Is_Valid_Revenue"]]
@@ -322,12 +389,20 @@ def render_profitability(dff: pd.DataFrame) -> html.Div:
         .assign(Margin_Pct=lambda d: d["Profit"] / d["Revenue"] * 100)
         .reindex(PROMOTION_ORDER).dropna().reset_index()
     )
-    fig_promo = px.scatter(promo, x="Avg_Discount", y="Margin_Pct", size="Revenue", text="Promotion_Type",
+    # At phone width the full promotion names collide into illegibility, so the
+    # points carry short codes and the table below the chart carries the full
+    # names alongside every number the scatter encodes.
+    promo["Point_Label"] = (promo["Promotion_Type"].map(PROMO_SHORT_LABEL) if view.is_narrow
+                            else promo["Promotion_Type"])
+    fig_promo = px.scatter(promo, x="Avg_Discount", y="Margin_Pct", size="Revenue", text="Point_Label",
                             color="Margin_Pct", color_continuous_scale=DIVERGING_BLUE_RED, color_continuous_midpoint=0,
-                            title="Discount Depth vs Margin by Promotion", size_max=46)
+                            title="Discount Depth vs Margin by Promotion",
+                            size_max=32 if view.is_narrow else 46,
+                            custom_data=["Promotion_Type"])
     fig_promo.update_traces(
-        marker=dict(sizemin=16, line=dict(width=2, color=SURFACE)),
-        hovertemplate="<b>%{text}</b><br>Margin: %{y:.1f}%<br>Avg discount: %{x:.1f}%<br>Revenue: ₹%{marker.size:,.0f}<extra></extra>",
+        marker=dict(sizemin=12 if view.is_narrow else 16, line=dict(width=2, color=SURFACE)),
+        # Hover reads the full promotion name even when the point label is short.
+        hovertemplate="<b>%{customdata[0]}</b><br>Margin: %{y:.1f}%<br>Avg discount: %{x:.1f}%<br>Revenue: ₹%{marker.size:,.0f}<extra></extra>",
     )
     fig_promo.add_hline(y=0, line_dash="dot", line_color=INK["axis"], line_width=1,
                          annotation_text="break-even", annotation_font_color=INK["muted"],
@@ -337,8 +412,9 @@ def render_profitability(dff: pd.DataFrame) -> html.Div:
     label_pos = {"No Promotion": "top center", "Category Offer": "top center", "Member Offer": "bottom center",
                  "Festival Sale": "top center", "Flash Deal": "bottom center"}
     fig_promo.data[0].textposition = [label_pos[p] for p in promo["Promotion_Type"]]
-    fig_promo.data[0].textfont = dict(color=INK["primary"], size=12)
-    y_pad = max((promo["Margin_Pct"].max() - promo["Margin_Pct"].min()) * 0.25, 2)
+    fig_promo.data[0].textfont = dict(color=INK["primary"], size=10 if view.is_narrow else 12)
+    # More vertical breathing room on a phone so the short codes clear their points.
+    y_pad = max((promo["Margin_Pct"].max() - promo["Margin_Pct"].min()) * (0.38 if view.is_narrow else 0.25), 2)
     fig_promo.update_layout(
         xaxis_title="Average Discount (%)", yaxis_title="Profit Margin (%)", showlegend=False,
         coloraxis_showscale=False,
@@ -375,23 +451,33 @@ def render_profitability(dff: pd.DataFrame) -> html.Div:
                                   yaxis=dict(range=[0, seg["Margin_Pct"].max() * 1.25]))
     finalize(fig_seg_margin, height=320)
 
-    tbl = table_view(
-        cat.assign(Revenue=lambda d: d["Revenue"].round(0), Profit=lambda d: d["Profit"].round(0)),
-        ["Category", "Revenue", "Profit", "Orders", "Margin_Pct"],
-        "Category profitability (filtered selection, worst margin first)",
-    )
+    tables = [
+        table_view(
+            cat.assign(Revenue=lambda d: d["Revenue"].round(0), Profit=lambda d: d["Profit"].round(0)),
+            ["Category", "Revenue", "Profit", "Orders", "Margin_Pct"],
+            "Category profitability (filtered selection, worst margin first)", view,
+        )
+    ]
+    if view.is_narrow:
+        # The promotion scatter's point labels are abbreviated at this width, so
+        # ship the full names and figures as a table rather than lose them.
+        tables.append(table_view(
+            promo.assign(Revenue=lambda d: d["Revenue"].round(0)),
+            ["Promotion_Type", "Avg_Discount", "Margin_Pct", "Revenue", "Orders"],
+            "Promotion economics (full names for the chart above)", view,
+        ))
 
     return html.Div([
-        dbc.Row([dbc.Col(dcc.Graph(figure=fig_cat, config={"displayModeBar": False}), md=6),
-                 dbc.Col(dcc.Graph(figure=fig_promo, config={"displayModeBar": False}), md=6)], className="g-3"),
-        dbc.Row([dbc.Col(dcc.Graph(figure=fig_seg, config={"displayModeBar": False}), md=6),
-                 dbc.Col(dcc.Graph(figure=fig_seg_margin, config={"displayModeBar": False}), md=6)],
+        dbc.Row([dbc.Col(graph(fig_cat, view), **CHART_COL, className="chart-cell"),
+                 dbc.Col(graph(fig_promo, view), **CHART_COL, className="chart-cell")], className="g-3"),
+        dbc.Row([dbc.Col(graph(fig_seg, view), **CHART_COL, className="chart-cell"),
+                 dbc.Col(graph(fig_seg_margin, view), **CHART_COL, className="chart-cell")],
                 className="g-3 mt-1"),
-        tbl,
+        *tables,
     ])
 
 
-def render_customers(dff: pd.DataFrame) -> html.Div:
+def render_customers(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
     if dff.empty:
         return empty_state()
     valid = dff[dff["Is_Valid_Revenue"]]
@@ -456,20 +542,20 @@ def render_customers(dff: pd.DataFrame) -> html.Div:
     chan_tbl = table_view(
         chan.assign(Revenue=lambda d: d["Revenue"].round(0), Marketing_Cost=lambda d: d["Marketing_Cost"].round(0)),
         ["Acquisition_Channel", "Revenue", "Orders", "Marketing_Cost", "Marketing_Pct"],
-        "Acquisition channel economics (filtered selection)",
+        "Acquisition channel economics (filtered selection)", view,
     )
 
     return html.Div([
-        dbc.Row([dbc.Col(dcc.Graph(figure=fig_nvr, config={"displayModeBar": False}), md=6),
-                 dbc.Col(dcc.Graph(figure=fig_loy, config={"displayModeBar": False}), md=6)], className="g-3"),
-        dbc.Row([dbc.Col(dcc.Graph(figure=fig_chan, config={"displayModeBar": False}), md=6),
-                 dbc.Col(dcc.Graph(figure=fig_rating, config={"displayModeBar": False}), md=6)],
+        dbc.Row([dbc.Col(graph(fig_nvr, view), **CHART_COL, className="chart-cell"),
+                 dbc.Col(graph(fig_loy, view), **CHART_COL, className="chart-cell")], className="g-3"),
+        dbc.Row([dbc.Col(graph(fig_chan, view), **CHART_COL, className="chart-cell"),
+                 dbc.Col(graph(fig_rating, view), **CHART_COL, className="chart-cell")],
                 className="g-3 mt-1"),
         chan_tbl,
     ])
 
 
-def render_operations(dff: pd.DataFrame) -> html.Div:
+def render_operations(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
     if dff.empty:
         return empty_state()
 
@@ -525,34 +611,38 @@ def render_operations(dff: pd.DataFrame) -> html.Div:
     finalize(fig_ret, height=320)
 
     # --- Delivery delay distribution: single continuous series -> flat orange (friction/cost family).
-    fig_delay = px.histogram(dff.dropna(subset=["Delivery_Delay_Days"]), x="Delivery_Delay_Days", nbins=30,
+    # 30 bins across a phone's ~340px plot leaves sub-pixel bars, so halve the
+    # resolution rather than render a smear.
+    fig_delay = px.histogram(dff.dropna(subset=["Delivery_Delay_Days"]), x="Delivery_Delay_Days",
+                              nbins=15 if view.is_narrow else 30,
                               title="Delivery Delay Distribution (days)", color_discrete_sequence=[C_COST])
     fig_delay.update_traces(marker=dict(cornerradius=2), hovertemplate="<b>%{y:,}</b> orders<br>~%{x:.1f} days late<extra></extra>")
     fig_delay.update_layout(xaxis_title="Delay (days)", yaxis_title="Orders", bargap=0.08, showlegend=False)
     finalize(fig_delay, height=320)
 
+    kpi_col = {"xs": 6, "md": 3}
     cards = dbc.Row([
         dbc.Col(stat_card("On-Time Rate", f"{dff['On_Time_Flag'].mean() * 100:.1f}%",
-                           rate_status(dff['On_Time_Flag'].mean() * 100, 75, 50, lower_is_better=False)), md=3),
+                           rate_status(dff['On_Time_Flag'].mean() * 100, 75, 50, lower_is_better=False)), **kpi_col),
         dbc.Col(stat_card("Return Rate", f"{dff['Return_Flag'].mean() * 100:.1f}%",
-                           rate_status(dff['Return_Flag'].mean() * 100, 5, 10)), md=3),
+                           rate_status(dff['Return_Flag'].mean() * 100, 5, 10)), **kpi_col),
         dbc.Col(stat_card("Cancellation Rate", f"{dff['Cancellation_Flag'].mean() * 100:.1f}%",
-                           rate_status(dff['Cancellation_Flag'].mean() * 100, 2, 5)), md=3),
+                           rate_status(dff['Cancellation_Flag'].mean() * 100, 2, 5)), **kpi_col),
         dbc.Col(stat_card("Complaint Rate", f"{dff['Complaint_Flag'].mean() * 100:.1f}%",
-                           rate_status(dff['Complaint_Flag'].mean() * 100, 5, 10)), md=3),
+                           rate_status(dff['Complaint_Flag'].mean() * 100, 5, 10)), **kpi_col),
     ], className="g-3 mb-3")
 
     ops_tbl = table_view(
         ops.round(1), ["Fulfillment_Mode", "Orders", "On_Time_Rate", "Avg_Rating"],
-        "Fulfillment performance (filtered selection)",
+        "Fulfillment performance (filtered selection)", view,
     )
 
     return html.Div([
         cards,
-        dbc.Row([dbc.Col([dcc.Graph(figure=fig_ops, config={"displayModeBar": False}), ops_legend], md=6),
-                 dbc.Col(dcc.Graph(figure=fig_complaint, config={"displayModeBar": False}), md=6)], className="g-3"),
-        dbc.Row([dbc.Col(dcc.Graph(figure=fig_ret, config={"displayModeBar": False}), md=6),
-                 dbc.Col(dcc.Graph(figure=fig_delay, config={"displayModeBar": False}), md=6)],
+        dbc.Row([dbc.Col([graph(fig_ops, view), ops_legend], **CHART_COL, className="chart-cell"),
+                 dbc.Col(graph(fig_complaint, view), **CHART_COL, className="chart-cell")], className="g-3"),
+        dbc.Row([dbc.Col(graph(fig_ret, view), **CHART_COL, className="chart-cell"),
+                 dbc.Col(graph(fig_delay, view), **CHART_COL, className="chart-cell")],
                 className="g-3 mt-1"),
         ops_tbl,
     ])
@@ -572,8 +662,82 @@ app = dash.Dash(
     external_stylesheets=[dbc.themes.BOOTSTRAP],
     title="AuroraCart Diagnostic Dashboard",
     suppress_callback_exceptions=True,
+    meta_tags=[
+        # Without this, mobile browsers render at a ~980px virtual width and
+        # scale the whole page down — the single most common reason a Dash app
+        # looks "broken" on a phone. `viewport-fit=cover` lets the layout reach
+        # under a notch, which style.css then pads back with safe-area insets.
+        {"name": "viewport",
+         "content": "width=device-width, initial-scale=1, viewport-fit=cover"},
+        # No `maximum-scale` / `user-scalable=no`: pinch-zoom stays available.
+        # Suppressing it would fail WCAG 2.1 SC 1.4.4 (Resize Text).
+        {"name": "description",
+         "content": "AuroraCart profitability & operations diagnostic — revenue, margin, "
+                    "customers and delivery performance, Jan 2023 to Dec 2025."},
+        {"name": "theme-color", "content": "#f9f9f7"},
+        {"name": "color-scheme", "content": "light"},
+        {"name": "mobile-web-app-capable", "content": "yes"},
+        {"name": "apple-mobile-web-app-capable", "content": "yes"},
+        {"name": "apple-mobile-web-app-status-bar-style", "content": "default"},
+        {"name": "apple-mobile-web-app-title", "content": "AuroraCart"},
+        # Stops iOS Safari turning order counts and dates into blue "call" links.
+        {"name": "format-detection", "content": "telephone=no"},
+    ],
 )
 server = app.server  # exposed for gunicorn: `gunicorn dashboard:server`
+
+# Dash renders its scripts at the end of <body>, which would leave the first
+# paint un-stamped. This inline snippet applies a provisional viewport class in
+# <head> so the page never flashes a desktop-shaped layout on a phone;
+# assets/environment.js then takes over and replaces these with the full set.
+app.index_string = """<!DOCTYPE html>
+<html lang="en">
+    <head>
+        {%metas%}
+        <title>{%title%}</title>
+        {%favicon%}
+        {%css%}
+        <script>
+        (function () {
+          try {
+            var d = document.documentElement;
+            var w = window.innerWidth || d.clientWidth || 1024;
+            var h = window.innerHeight || d.clientHeight || 768;
+            d.classList.add("env-" + (w >= 1400 ? "xxl" : w >= 1200 ? "xl" : w >= 992 ? "lg"
+                                    : w >= 768 ? "md" : w >= 576 ? "sm" : "xs"));
+            if (w < 768) d.classList.add("env-narrow");
+            if (w < 992) d.classList.add("env-compact");
+            if ((navigator.maxTouchPoints || 0) > 0 || "ontouchstart" in window) {
+              d.classList.add("env-touch");
+            }
+            d.style.setProperty("--vh", (h / 100) + "px");
+          } catch (e) { /* CSS media queries still lay the page out correctly */ }
+        })();
+        </script>
+    </head>
+    <body>
+        <noscript>
+          <div style="margin:12px;padding:12px;border:1px solid #c3c2b7;border-radius:10px;
+                      font-family:system-ui,sans-serif;font-size:13px;background:#fcfcfb">
+            This dashboard needs JavaScript for its charts and filters. The layout below is
+            still responsive, but the interactive views will not load.
+          </div>
+        </noscript>
+        {%app_entry%}
+        <footer>
+            {%config%}
+            {%scripts%}
+            {%renderer%}
+        </footer>
+    </body>
+</html>"""
+
+# Column spans per tier. At `lg` all six controls share one row (3+2+2+2+2+1);
+# at `md` they fold into two rows of twelve (6+3+3 / 3+3+6); on a phone the date
+# range and Reset take a full row each and the four dropdowns pair up two-across.
+_FILTER_WIDE = {"xs": 12, "md": 6, "lg": 3}
+_FILTER_NARROW = {"xs": 6, "md": 3, "lg": 2}
+_FILTER_RESET = {"xs": 12, "md": 6, "lg": 1}
 
 filter_bar = dbc.Row(
     [
@@ -583,34 +747,51 @@ filter_bar = dbc.Row(
                 id="date-range", min_date_allowed=MIN_DATE, max_date_allowed=MAX_DATE,
                 start_date=MIN_DATE, end_date=MAX_DATE, display_format="MMM YYYY",
                 className="filter-control",
+                # Overridden per-viewport by `adapt_date_picker` below: one month
+                # and a full-screen calendar on a phone, two months inline on a
+                # desktop. A two-month inline calendar does not fit under 500px.
+                number_of_months_shown=2,
             ),
-        ], md=3),
+        ], **_FILTER_WIDE, className="filter-col"),
         dbc.Col([
             html.Label("Region", className="filter-label"),
             dcc.Dropdown(id="region-filter", options=REGION_ORDER, multi=True, placeholder="All regions"),
-        ], md=2),
+        ], **_FILTER_NARROW, className="filter-col"),
         dbc.Col([
             html.Label("Category", className="filter-label"),
             dcc.Dropdown(id="category-filter", options=CATEGORY_ORDER, multi=True, placeholder="All categories"),
-        ], md=2),
+        ], **_FILTER_NARROW, className="filter-col"),
         dbc.Col([
             html.Label("Customer Segment", className="filter-label"),
             dcc.Dropdown(id="segment-filter", options=SEGMENT_ORDER, multi=True, placeholder="All segments"),
-        ], md=2),
+        ], **_FILTER_NARROW, className="filter-col"),
         dbc.Col([
             html.Label("Fulfillment Mode", className="filter-label"),
             dcc.Dropdown(id="fulfillment-filter", options=FULFILLMENT_ORDER, multi=True, placeholder="All modes"),
-        ], md=2),
+        ], **_FILTER_NARROW, className="filter-col"),
         dbc.Col([
-            html.Label(" ", className="filter-label"),
+            # The spacer label only exists to align Reset with the controls on the
+            # single-row desktop layout; on smaller tiers it would be dead space.
+            html.Label(" ", className="filter-label d-none d-lg-block"),
             dbc.Button("Reset", id="reset-btn", color="light", className="w-100 reset-btn"),
-        ], md=1),
+        ], **_FILTER_RESET, className="filter-col"),
     ],
     className="g-2 filter-bar",
 )
 
+# On a phone the filter panel is ~3 rows tall — worth having, but not worth
+# scrolling past on every visit. The toggle is CSS-hidden from `md` up, and the
+# panel starts open so nothing is ever hidden without the user asking.
+filter_panel = html.Div([
+    dbc.Button(id="filter-toggle", color="light", className="filter-toggle", n_clicks=0),
+    dbc.Collapse(filter_bar, id="filter-collapse", is_open=True),
+])
+
 app.layout = dbc.Container(
     [
+        # Populated by assets/environment.js — see the module docstring. Nothing
+        # breaks if it stays empty; the server just uses its default profile.
+        dcc.Store(id="env-store", storage_type="memory"),
         html.Div(
             [
                 html.Div("AC", className="brand-mark"),
@@ -622,7 +803,7 @@ app.layout = dbc.Container(
             ],
             className="header",
         ),
-        filter_bar,
+        filter_panel,
         dcc.Tabs(
             id="tabs", value="overview", className="app-tabs",
             children=[
@@ -634,14 +815,38 @@ app.layout = dbc.Container(
         ),
         dcc.Loading(html.Div(id="tab-content", className="tab-content"), type="circle", color=CATEGORICAL[0]),
         html.Footer(
-            "Synthetic case-study dataset (AuroraCart at a Crossroads). "
-            "Cancelled orders are excluded from revenue/margin figures; returns are not "
-            "netted out of Net_Revenue. See the EDA notebook and README for full methodology and limitations.",
+            [
+                html.Div(
+                    "Synthetic case-study dataset (AuroraCart at a Crossroads). "
+                    "Cancelled orders are excluded from revenue/margin figures; returns are not "
+                    "netted out of Net_Revenue. See the EDA notebook and README for full "
+                    "methodology and limitations."
+                ),
+                html.Div(id="env-readout", className="env-readout"),
+            ],
             className="footer",
         ),
     ],
     fluid=True,
     className="app-container",
+)
+
+
+# Seeds env-store on page load. assets/environment.js keeps it current
+# afterwards by calling dash_clientside.set_props on resize/rotation, so this
+# fires exactly once. The `id` prop is a stable Input that never changes — the
+# standard way to run a clientside callback at startup.
+app.clientside_callback(
+    """
+    function (_) {
+        if (window.auroracartEnv && window.auroracartEnv.profile) {
+            return window.auroracartEnv.profile();
+        }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("env-store", "data"),
+    Input("env-store", "id"),
 )
 
 
@@ -654,10 +859,55 @@ app.layout = dbc.Container(
     Input("category-filter", "value"),
     Input("segment-filter", "value"),
     Input("fulfillment-filter", "value"),
+    Input("env-store", "data"),
 )
-def update_tab(tab, start_date, end_date, regions, categories, segments, fulfillment):
+def update_tab(tab, start_date, end_date, regions, categories, segments, fulfillment, env):
     dff = apply_filters(DF, start_date, end_date, regions, categories, segments, fulfillment)
-    return RENDERERS[tab](dff)
+    return RENDERERS[tab](dff, profile_from_store(env))
+
+
+@app.callback(
+    Output("date-range", "number_of_months_shown"),
+    Output("date-range", "with_full_screen_portal"),
+    Input("env-store", "data"),
+)
+def adapt_date_picker(env):
+    """Give the date picker a phone-shaped calendar.
+
+    An inline two-month calendar is ~600px wide and gets clipped by the viewport
+    on any phone. Below `md` it drops to a single month presented in a
+    full-screen portal, which is both readable and thumb-reachable.
+    """
+    view = profile_from_store(env)
+    return view.date_months_shown, view.is_narrow
+
+
+@app.callback(
+    Output("env-readout", "children"),
+    Input("env-store", "data"),
+)
+def show_environment(env):
+    """Surface what the app detected — useful when a layout looks wrong on an
+    unfamiliar device and someone needs to report what it actually saw."""
+    return profile_from_store(env).describe()
+
+
+@app.callback(
+    Output("filter-collapse", "is_open"),
+    Output("filter-toggle", "children"),
+    Input("filter-toggle", "n_clicks"),
+    Input("region-filter", "value"),
+    Input("category-filter", "value"),
+    Input("segment-filter", "value"),
+    Input("fulfillment-filter", "value"),
+)
+def toggle_filters(n_clicks, regions, categories, segments, fulfillment):
+    """Collapse the filter panel on small screens, and label the toggle with how
+    many filters are active — so a collapsed panel never hides a live filter."""
+    is_open = (n_clicks or 0) % 2 == 0
+    active = sum(len(values) for values in (regions, categories, segments, fulfillment) if values)
+    suffix = f" · {active} active" if active else ""
+    return is_open, f"{'Hide' if is_open else 'Show'} filters{suffix}"
 
 
 @app.callback(

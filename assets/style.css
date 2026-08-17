@@ -1,3 +1,17 @@
+/*
+ * AuroraCart dashboard styles.
+ *
+ * Organised as: tokens -> base/reset -> layout -> components -> responsive
+ * layers -> environment hooks -> preference & media overrides.
+ *
+ * Responsive strategy: the layout is driven by CSS alone (Bootstrap's grid plus
+ * the media queries below), so it lays out correctly with JavaScript disabled.
+ * assets/environment.js additionally stamps `env-*` classes onto <html> for the
+ * things a media query genuinely cannot answer — pointer type, browser engine,
+ * missing feature support — and those only ever *refine* what is already
+ * correct here.
+ */
+
 :root {
   --surface-1: #fcfcfb;
   --page-plane: #f9f9f7;
@@ -8,18 +22,62 @@
   --axis: #c3c2b7;
   --border: rgba(11, 11, 11, 0.10);
   --accent: #2a78d6;
+  --focus-ring: rgba(42, 120, 214, 0.45);
+
+  /* Set from JS (assets/environment.js); the fallback keeps CSS standalone. */
+  --vh: 1vh;
+
+  --gutter: 24px;
+  --radius: 12px;
+  --tap-target: 44px;
+
+  /* The dashboard is a fixed light-surface design — the Plotly palette is
+     validated against this exact background. Declaring the scheme stops
+     Chrome for Android's auto-dark from re-rendering it into an unvalidated
+     inverted palette. */
+  color-scheme: light;
+}
+
+/* --------------------------------------------------------------------- base */
+
+html {
+  /* iOS inflates font sizes on rotation to landscape unless this is pinned. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
   background: var(--page-plane);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   color: var(--text-primary);
+  /* A single stray wide child must never make the whole page pan sideways;
+     wide content scrolls inside its own container instead (see .table-wrap). */
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
+
+/* Nothing may exceed the viewport width and force a horizontal page scroll. */
+img,
+svg,
+table {
+  max-width: 100%;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ------------------------------------------------------------------ layout */
 
 .app-container {
   max-width: 1400px;
-  padding-top: 24px;
+  padding-top: var(--gutter);
   padding-bottom: 40px;
+  /* Notched phones in landscape, and any device with a home indicator. */
+  padding-left: max(12px, env(safe-area-inset-left));
+  padding-right: max(12px, env(safe-area-inset-right));
 }
 
 .header {
@@ -46,22 +104,33 @@ body {
 }
 
 .page-title {
-  font-size: 26px;
+  /* Scales smoothly between phone and desktop instead of stepping at a
+     breakpoint; the @supports block below covers browsers without clamp(). */
+  font-size: clamp(19px, 4.2vw, 26px);
   font-weight: 700;
   margin: 0;
   color: var(--text-primary);
+  line-height: 1.2;
 }
 
 .page-subtitle {
   margin: 2px 0 0 0;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: clamp(12px, 2.6vw, 14px);
+  line-height: 1.4;
 }
+
+@supports not (font-size: clamp(1px, 1vw, 2px)) {
+  .page-title { font-size: 22px; }
+  .page-subtitle { font-size: 13px; }
+}
+
+/* ------------------------------------------------------------- filter bar */
 
 .filter-bar {
   background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 14px 16px 6px 16px;
   margin-bottom: 18px;
   box-shadow: 0 1px 2px rgba(11, 11, 11, 0.04);
@@ -77,30 +146,134 @@ body {
   display: block;
 }
 
+.filter-col {
+  margin-bottom: 10px;
+}
+
 .reset-btn {
   border: 1px solid var(--border) !important;
   color: var(--text-secondary) !important;
   font-size: 13px !important;
+  min-height: var(--tap-target);
+  touch-action: manipulation;
+}
+
+/* The filter panel is collapsible on small screens only; the toggle is hidden
+   from `md` up, where all six controls fit without stealing the first screen. */
+.filter-toggle {
+  display: none;
+  width: 100%;
+  min-height: var(--tap-target);
+  margin-bottom: 12px;
+  border: 1px solid var(--border) !important;
+  background: var(--surface-1) !important;
+  color: var(--text-secondary) !important;
+  font-size: 14px !important;
+  font-weight: 600;
+  touch-action: manipulation;
+}
+
+/* Dash's dropdown and date picker (Dash 4 component classes). Both need to fill
+   their column rather than sit at an intrinsic desktop width. */
+.dash-dropdown,
+.dash-dropdown-wrapper,
+.dash-dropdown-trigger,
+.dash-datepicker,
+.dash-datepicker-input-wrapper {
+  width: 100%;
+  max-width: 100%;
+}
+
+.dash-dropdown-trigger,
+.dash-datepicker-input-wrapper {
+  min-height: var(--tap-target);
+}
+
+/* Dash's dropdown renders a bare <input> for keyboard focus management. With no
+   width of its own it takes the browser's ~208px intrinsic default, which is
+   wider than a half-width column on a phone and pushes the page sideways — the
+   one element that was still forcing a horizontal scroll. */
+.dash-dropdown-focus-target {
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* The dropdown menu must never be wider than the viewport. */
+.dash-dropdown-content,
+.dash-dropdown-options {
+  max-width: calc(100vw - 32px);
+}
+
+/* The full-screen date portal fills the viewport exactly; its inner calendar
+   wrapper is wider than its own box and would otherwise let the overlay pan. */
+.dash-datepicker-portal,
+.dash-datepicker-fullscreen {
+  max-width: 100vw;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+
+.dash-datepicker-portal .dash-datepicker-calendar-wrapper {
+  max-width: 100%;
+}
+
+/* -------------------------------------------------------------------- tabs */
+
+.app-tabs {
+  margin-bottom: 6px;
 }
 
 .app-tabs .tab {
   font-family: system-ui, sans-serif;
+  touch-action: manipulation;
 }
 
-.app-tabs {
-  margin-bottom: 6px;
+/* dcc.Tabs puts `tab-container` on the same element as our `app-tabs` class
+   (not a descendant), and stacks the tabs into full-width rows below its own
+   mobile breakpoint. That stacking is the right call on a phone — every label
+   stays readable and each tab becomes a large tap target — so it is kept, and
+   only the tap height is enforced.
+
+   From `sm` up the tabs lay out as a row again; there the strip scrolls
+   horizontally rather than squeezing four labels into ellipses. */
+@media (min-width: 576px) {
+  .app-tabs.tab-container {
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .app-tabs.tab-container::-webkit-scrollbar {
+    display: none;
+  }
+
+  .app-tabs.tab-container > .tab {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    scroll-snap-align: start;
+  }
 }
 
 .tab-content {
   padding-top: 14px;
 }
 
+/* -------------------------------------------------------------- stat cards */
+
 .stat-card {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--surface-1);
   box-shadow: 0 1px 2px rgba(11, 11, 11, 0.04);
   height: 100%;
+}
+
+.stat-card .card-body {
+  padding: 14px 16px;
 }
 
 .stat-label {
@@ -109,14 +282,17 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--text-muted);
+  /* Two-word labels wrap rather than overflow a half-width phone card. */
+  line-height: 1.25;
 }
 
 .stat-value {
-  font-size: 26px;
+  font-size: clamp(20px, 5vw, 26px);
   font-weight: 700;
   color: var(--text-primary);
   margin-top: 4px;
   font-variant-numeric: proportional-nums;
+  line-height: 1.15;
 }
 
 .stat-sub {
@@ -130,10 +306,14 @@ body {
   font-weight: 600;
   margin-top: 2px;
   font-variant-numeric: proportional-nums;
+  line-height: 1.3;
 }
+
+/* ---------------------------------------------------------------- content */
 
 .status-legend {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   justify-content: center;
   padding: 6px 0 2px 0;
@@ -152,6 +332,7 @@ body {
   height: 8px;
   border-radius: 50%;
   display: inline-block;
+  flex-shrink: 0;
 }
 
 .story-callout {
@@ -167,7 +348,7 @@ body {
 .table-wrap {
   background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 14px 16px;
   margin-top: 16px;
 }
@@ -179,11 +360,91 @@ body {
   margin-bottom: 8px;
 }
 
-.js-plotly-plot {
+/* Wide tables scroll inside their own box — never the page. */
+.table-wrap .dash-table-container,
+.table-wrap .dash-spreadsheet-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  max-width: 100%;
+}
+
+/* When a table really is wider than its box, assets/scroll-hints.js marks the
+   scroller and these turn that into a visible affordance: a fade at the right
+   edge, plus a caption on phones where the clipped column is least expected.
+   Both disappear once the content fits or the user reaches the end. */
+.table-wrap .dash-spreadsheet-container.is-scrollable,
+.table-wrap .dash-table-container.is-scrollable {
+  position: relative;
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+}
+
+.table-wrap .dash-spreadsheet-container.is-scrollable.is-scrolled-end,
+.table-wrap .dash-table-container.is-scrollable.is-scrolled-end {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+/* The caption carries the same information as the fade in words, so a browser
+   without mask-image support still tells the user the table continues. */
+.table-wrap.has-overflow::after {
+  content: "Swipe the table sideways for the remaining columns";
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* DataTable ships its pagination controls at ~25px tall — under half the 44px
+   minimum, and they are the only way to reach page 2 of a table on a phone. */
+.table-wrap .dash-table-container button,
+.table-wrap .dash-table-container input.current-page {
+  min-height: var(--tap-target);
+  min-width: 34px;
+  touch-action: manipulation;
+}
+
+.table-wrap .dash-table-container .previous-next-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.chart-cell {
+  min-width: 0;  /* lets a flex/grid child actually shrink below its content */
+}
+
+/* The card frame lives on dcc.Graph's own wrapper, not on the Plotly node.
+   `content-box` is deliberate: the inline height dashboard.py sets is the height
+   of the *plot*, and the frame is added around it. With the frame inside that
+   height instead, Plotly's SVG is taller than the box it sits in and the x-axis
+   title gets clipped off the bottom of every chart.
+
+   The same box-sizing applies to width, so the width is stated explicitly as
+   "the column minus the frame" — derived from the frame variables rather than
+   hard-coded, so changing the padding below cannot desynchronise it. */
+.dash-graph {
+  --chart-pad: 6px;
+  --chart-border: 1px;
+
   background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 6px;
+  border: var(--chart-border) solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--chart-pad);
+  box-sizing: content-box;
+  /* Flattened deliberately. The grouped form
+     `calc(100% - 2 * (var(--chart-pad) + var(--chart-border)))` fails at
+     var()-substitution time rather than at parse time, so it survives
+     CSS.supports() and then silently resolves the width to `auto` — which under
+     content-box overflows the column by exactly the frame. */
+  width: calc(100% - 2 * var(--chart-pad) - 2 * var(--chart-border));
+}
+
+.js-plotly-plot {
+  width: 100%;
+  height: 100%;
 }
 
 .footer {
@@ -193,4 +454,256 @@ body {
   font-size: 12px;
   color: var(--text-muted);
   text-align: center;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.env-readout {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.no-js-note {
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+/* ------------------------------------------------- responsive: <= 991.98px */
+/* Tablets and below: the grid has already gone full-width, so tighten chrome. */
+
+@media (max-width: 991.98px) {
+  :root {
+    --gutter: 16px;
+  }
+
+  .app-container {
+    padding-top: 16px;
+    padding-bottom: 28px;
+  }
+
+  .header {
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .filter-bar {
+    padding: 12px 12px 4px 12px;
+  }
+}
+
+/* ------------------------------------------------- responsive: <= 767.98px */
+/* Phones. */
+
+@media (max-width: 767.98px) {
+  .app-container {
+    padding-left: max(10px, env(safe-area-inset-left));
+    padding-right: max(10px, env(safe-area-inset-right));
+  }
+
+  .brand-mark {
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+    font-size: 16px;
+  }
+
+  .filter-toggle {
+    display: block;
+  }
+
+  .filter-bar {
+    margin-bottom: 14px;
+  }
+
+  .filter-col {
+    margin-bottom: 12px;
+  }
+
+  /* Two filters share each row here, and their labels are not the same length
+     ("Fulfillment Mode" fits one line, "Customer Segment" does not). Reserving
+     two lines for every label keeps the controls beside each other aligned. */
+  .filter-label {
+    min-height: 2.1em;
+  }
+
+  /* Any text input at under 16px triggers iOS Safari's zoom-on-focus, which
+     leaves the page zoomed in and the layout stranded off-screen. Matched on the
+     bare `input` element too — Dash's dropdown inputs carry no `type`. */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  .app-tabs .tab {
+    padding: 12px 14px !important;
+    font-size: 13px !important;
+  }
+
+  .dash-graph {
+    --chart-pad: 4px;
+    border-radius: 10px;
+  }
+
+  .table-wrap {
+    padding: 12px;
+  }
+
+  .story-callout {
+    font-size: 13px;
+  }
+
+  .footer {
+    font-size: 11px;
+    text-align: left;
+  }
+}
+
+/* ------------------------------------------------- responsive: <= 575.98px */
+/* Small phones — the tightest supported width (down to 320px). */
+
+@media (max-width: 575.98px) {
+  .header {
+    gap: 10px;
+  }
+
+  .stat-card .card-body {
+    padding: 12px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    letter-spacing: 0.02em;
+  }
+
+  .stat-sub,
+  .stat-delta {
+    font-size: 11px;
+  }
+
+  .status-legend {
+    gap: 10px;
+  }
+
+  .legend-chip {
+    font-size: 11px;
+  }
+}
+
+/* Landscape phones: very little vertical room, so trim anything decorative. */
+@media (max-height: 480px) and (orientation: landscape) {
+  .app-container {
+    padding-top: 10px;
+  }
+
+  .header {
+    margin-bottom: 10px;
+  }
+
+  .page-subtitle {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------ environment hooks */
+/* Refinements JS detection enables; the layout is already correct without them. */
+
+/* A coarse pointer cannot hover, so every control gets a full tap target and
+   nothing is allowed to depend on :hover to be discoverable. */
+.env-touch .dash-dropdown-trigger,
+.env-touch .dash-datepicker-input-wrapper,
+.env-touch .btn,
+.env-touch .app-tabs .tab {
+  min-height: var(--tap-target);
+  touch-action: manipulation;
+}
+
+.env-touch .dash-dropdown-option {
+  min-height: var(--tap-target);
+  display: flex;
+  align-items: center;
+}
+
+/* Plotly draws its own hover layer; on touch it is tap-activated, so give the
+   tooltip room to be read rather than dismissed by the next tap. */
+.env-touch .hoverlayer text {
+  font-size: 13px;
+}
+
+/* iOS Safari keeps a rubber-band scroll on the whole document that makes an
+   inner horizontal scroller feel broken; containing it fixes the gesture. */
+.env-ios .table-wrap .dash-table-container,
+.env-ios .app-tabs .tab-container {
+  overscroll-behavior: contain;
+}
+
+/* Installed as a home-screen app: no browser chrome, so the status bar area is
+   ours to pad. */
+.env-standalone .app-container {
+  padding-top: max(var(--gutter), env(safe-area-inset-top));
+}
+
+/* Browsers without `dvh` get the JS-measured --vh, and those without either
+   fall back to plain vh via the custom property's own default. */
+.no-dvh .full-height {
+  height: calc(var(--vh, 1vh) * 100);
+}
+
+.full-height {
+  height: 100dvh;
+}
+
+/* Firefox and older Safari lack `scrollbar-gutter`, so a scrollbar appearing
+   mid-interaction shifts the layout; reserving the space is the fallback. */
+.no-scrollbar-gutter body {
+  overflow-y: scroll;
+}
+
+/* ------------------------------------------------------------ preferences */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Windows High Contrast / forced-colors: let the OS palette through, but keep
+   the borders that carry structure. */
+@media (forced-colors: active) {
+  .stat-card,
+  .filter-bar,
+  .table-wrap,
+  .dash-graph {
+    border: 1px solid CanvasText;
+  }
+}
+
+@media print {
+  body {
+    background: #fff;
+  }
+
+  .filter-bar,
+  .filter-toggle,
+  .app-tabs {
+    display: none !important;
+  }
+
+  .app-container {
+    max-width: none;
+    padding: 0;
+  }
+
+  .dash-graph,
+  .stat-card,
+  .table-wrap {
+    break-inside: avoid;
+    box-shadow: none;
+  }
 }

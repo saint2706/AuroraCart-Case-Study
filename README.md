@@ -12,7 +12,10 @@ a shared cleaning module, and an interactive Plotly Dash dashboard.
 | `viz_theme.py` | Shared Plotly theme (colorblind-validated palette, fonts, chart chrome) used by both artifacts. |
 | `AuroraCart_EDA.ipynb` | The analysis: data-quality audit, cleaning walkthrough, and the investigation that produced the findings below. Pre-executed — outputs are baked in. |
 | `dashboard.py` | The interactive deliverable — a 4-tab Plotly Dash app with global filters. |
-| `assets/style.css` | Dashboard styling (Dash auto-loads anything in `assets/`). |
+| `responsive.py` | Browser-environment profile + the figure adaptations that CSS can't reach (see below). |
+| `assets/style.css` | Dashboard styling and all responsive layout rules (Dash auto-loads anything in `assets/`). |
+| `assets/environment.js` | Detects the live browser — viewport tier, pointer type, engine, feature support. |
+| `assets/scroll-hints.js` | Flags data tables that are actually scrolling sideways, so no column is silently clipped. |
 | `requirements.txt` / `requirements-dev.txt` | Deployment deps / notebook-only extras. |
 | `render.yaml`, `Procfile` | Deployment config for Render (see below). |
 
@@ -46,6 +49,50 @@ over the same three years. Growth is being purchased, not earned for free.
 SKU-level cost breakdown to fully decompose *why* Electronics is unprofitable;
 delivery-delay → rating is a credible association, not proven causation. Full detail,
 with the numbers behind each claim, is in the notebook (§9–11).
+
+## Phones, tablets and browsers
+
+The dashboard is built to be used on a phone, not merely to survive on one. It
+was verified end-to-end on emulated iPhone SE / 14 Pro, Pixel 7, Galaxy S9+,
+iPad Mini (portrait and landscape), a 320px-wide viewport, and desktop — every
+tab, on each — with no horizontal page scroll, no clipped chart text, and no tap
+target under 44px.
+
+Adaptation happens in three layers, which is worth knowing before changing any
+of it:
+
+1. **CSS media queries** (`assets/style.css`) own the page layout: grid
+   stacking, type scale, tap targets, the collapsible filter panel. This layer
+   works with JavaScript disabled.
+2. **Browser detection** (`assets/environment.js`) measures what a media query
+   cannot express — pointer type, browser engine, `dvh`/`clamp`/safe-area
+   support, standalone (home-screen) mode — and stamps it on `<html>` as `env-*`
+   classes, then reports it into a `dcc.Store`.
+3. **Figure adaptation** (`responsive.py`) consumes that report for the things
+   locked inside a server-rendered Plotly figure: axis margins, tick-label
+   truncation and wrapping, title wrapping, histogram bin counts, and table page
+   size.
+
+What that buys on a small screen:
+
+- Charts go one-up below `lg`; category labels are truncated (horizontal bars)
+  or wrapped over two lines (vertical bars), with the full text always present
+  in the hover and in the plain-table twin beneath.
+- **Dragging a chart scrolls the page** instead of panning the axes — Plotly's
+  drag mode is switched off wherever the primary pointer is coarse, which is the
+  single worst Dash-on-mobile failure mode.
+- The date picker drops to a one-month, full-screen calendar; a two-month
+  inline calendar is ~600px wide and gets clipped by any phone viewport.
+- Filters collapse behind a toggle that reports how many are active, so a
+  collapsed panel never hides a live filter.
+- Tables that really are wider than their box say so and scroll in place.
+- Pinch-zoom is deliberately left enabled (no `maximum-scale`), per WCAG 2.1
+  SC 1.4.4.
+
+Detection is progressive enhancement throughout: if the JavaScript never reports
+in, `responsive.py` falls back to a desktop profile and the CSS layer still lays
+the page out correctly. The footer prints what was actually detected, which is
+the first thing to check if a layout looks wrong on an unfamiliar device.
 
 ## Running locally
 

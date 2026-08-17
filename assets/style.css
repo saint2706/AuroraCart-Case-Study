@@ -116,13 +116,42 @@ body {
   font-weight: 700;
   color: var(--text-primary);
   margin-top: 4px;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: proportional-nums;
 }
 
 .stat-sub {
   font-size: 12px;
   color: var(--text-secondary);
   margin-top: 2px;
+}
+
+.stat-delta {
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 2px;
+  font-variant-numeric: proportional-nums;
+}
+
+.status-legend {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  padding: 6px 0 2px 0;
+}
+
+.legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
 }
 
 .story-callout {

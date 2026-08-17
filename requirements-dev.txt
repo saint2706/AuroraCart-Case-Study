@@ -1,0 +1,6 @@
+# Extra dependencies to run AuroraCart_EDA.ipynb locally (not needed to run/deploy the dashboard).
+-r requirements.txt
+jupyter
+nbformat
+nbclient
+ipykernel

@@ -243,9 +243,22 @@ def _mark_event(fig, months: pd.Series, when: pd.Timestamp, label: str) -> None:
     """
     if months.empty or not (months.min() <= when <= months.max()):
         return
-    fig.add_vline(x=when, line_dash="dash", line_width=1, line_color=INK["muted"],
+    fig.add_vline(x=when.isoformat(), line_dash="dash", line_width=1, line_color=INK["muted"],
                   annotation_text=label, annotation_position="top left",
                   annotation_font=dict(color=INK["muted"], size=11))
+
+
+def _legend_placement(view: ViewProfile) -> dict:
+    """Where a legend can sit without colliding with a wrapped title.
+
+    Above the plot on wide screens (closest to the series it names); below it on
+    narrow ones, where ``responsive_figure`` wraps the title onto a second line
+    and reclaims the space the legend was using.
+    """
+    if view.is_narrow:
+        return dict(legend=dict(orientation="h", yanchor="top", y=-0.28, x=0, title=None),
+                    margin=dict(b=90))
+    return dict(legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0, title=None))
 
 
 def recommendation_card(rank: int, title: str, evidence: str, benefit: str,
@@ -664,7 +677,8 @@ def render_operations(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
     fig_ontime.update_traces(hovertemplate="<b>%{y:.1f}%</b> on time<br>%{x|%b %Y}<extra></extra>")
     for _, row in monthly_ops[monthly_ops["Is_Peak"]].iterrows():
         month_start = row["Order_YearMonth"]
-        fig_ontime.add_vrect(x0=month_start, x1=month_start + pd.offsets.MonthEnd(1),
+        fig_ontime.add_vrect(x0=month_start.isoformat(),
+                              x1=(month_start + pd.offsets.MonthEnd(1)).isoformat(),
                               fillcolor=STATUS["critical"], opacity=0.07, line_width=0, layer="below")
     _mark_event(fig_ontime, monthly_ops["Order_YearMonth"], A.LOGISTICS_START, "New logistics contract")
     fig_ontime.update_layout(xaxis_title=None, yaxis_title="On-Time Rate (%)",
@@ -752,16 +766,18 @@ def render_decision(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
                         annotation_text="break-even", annotation_font_color=INK["muted"],
                         annotation_position="bottom left")
     fig_bands.update_layout(xaxis_title="Discount applied", yaxis_title="Profit Margin (%)",
-                            legend=dict(orientation="h", y=-0.28, x=0, title=None))
+                            **_legend_placement(view))
     finalize(fig_bands, height=430)
 
     # --- The Question 4 pair. Same segments, same orders, two encodings: pooled
     # (a segment problem) and split by Electronics (a product-mix problem).
     confound = A.segment_margin_confound(dff).reindex(SEGMENT_ORDER).dropna(how="all").reset_index()
     confound["Label"] = confound["Margin_Pooled"].apply(lambda v: f"{v:.1f}%")
+    # Deliberately grey: this is the view being rejected, and giving it an identity
+    # hue would collide with the two series that Exhibit B uses to correct it.
     fig_pooled = px.bar(confound, x="Customer_Segment", y="Margin_Pooled",
                         title="Exhibit A — margin by segment (pooled)",
-                        color_discrete_sequence=[C_PROFIT], text="Label")
+                        color_discrete_sequence=[INK["muted"]], text="Label")
     fig_pooled.update_traces(textposition="outside", textfont_color=INK["secondary"],
                              hovertemplate=pct_hover("Segment"))
     style_bars(fig_pooled)
@@ -778,13 +794,13 @@ def render_decision(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
                                             "Margin_Ex_Electronics": "Everything else"})
     fig_split = px.bar(split, x="Customer_Segment", y="Margin_Pct", color="Basket", barmode="group",
                        title="Exhibit B — the same segments, split by what they bought",
-                       color_discrete_sequence=[CATEGORICAL[1], CATEGORICAL[0]],
+                       color_discrete_sequence=[CATEGORICAL[0], CATEGORICAL[1]],
                        category_orders={"Basket": ["Everything else", "Electronics orders"]})
     fig_split.update_traces(hovertemplate="<b>%{y:.1f}%</b> margin<br>%{x} · %{fullData.name}<extra></extra>")
     style_bars(fig_split)
     fig_split.add_hline(y=0, line_color=INK["axis"], line_width=1)
     fig_split.update_layout(xaxis_title=None, yaxis_title="Margin (%)",
-                            legend=dict(orientation="h", y=-0.28, x=0, title=None))
+                            **_legend_placement(view))
     finalize(fig_split, height=360)
 
     reading = dbc.Alert(

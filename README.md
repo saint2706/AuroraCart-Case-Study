@@ -1,151 +1,172 @@
 # AuroraCart at a Crossroads
 
-A profitability & operations diagnostic for the AuroraCart case study: an EDA notebook,
-a shared cleaning module, and an interactive Plotly Dash dashboard.
+**From dashboard to decision** — a profitability and operations diagnostic for the
+*Storytelling Using Data Visualization* case study: an EDA notebook, a five-page
+interactive Dash dashboard, and a decision-oriented executive story.
 
-## Files
+The board asked how AuroraCart should allocate growth investment over the next
+twelve months. This repository answers that question, shows the evidence, and
+says what the evidence cannot support.
 
-| File | What it is |
+---
+
+## The answer in one paragraph
+
+Revenue nearly doubled between 2023 and 2025 (₹29.3M → ₹58.0M) while margin fell
+from 12.4% to 7.1%. **Ninety-two percent of that decline is margin erosion inside
+categories AuroraCart already sold, not a shift in what it sells** — and it is
+concentrated almost entirely in Electronics, which is half of revenue at −4.9%
+margin because merchandise alone costs 94% of what those orders recognise.
+Meanwhile one company-wide discount policy is being applied to two businesses
+with completely different tolerance for it: Electronics turns loss-making above a
+10% discount, while the rest of the business still earns double digits at 25%
+off. The delivery function everyone assumed was broken is the one thing that
+measurably improved.
+
+Three actions follow, in priority order. They are in
+**[docs/recommendations.md](docs/recommendations.md)**.
+
+---
+
+## Start here
+
+| If you want… | Go to |
 |---|---|
-| `data-AuroraCart.csv` | Raw case-study export (15,000 orders, Jan 2023 – Dec 2025). |
-| `data_prep.py` | Single source of truth for cleaning + feature engineering. Imported by both the notebook and the dashboard so their numbers can never drift apart. |
-| `viz_theme.py` | Shared Plotly theme (colorblind-validated palette, fonts, chart chrome) used by both artifacts. |
-| `AuroraCart_EDA.ipynb` | The analysis: data-quality audit, cleaning walkthrough, and the investigation that produced the findings below. Pre-executed — outputs are baked in. |
-| `dashboard.py` | The interactive deliverable — a 4-tab Plotly Dash app with global filters. |
-| `responsive.py` | Browser-environment profile + the figure adaptations that CSS can't reach (see below). |
-| `assets/style.css` | Dashboard styling and all responsive layout rules (Dash auto-loads anything in `assets/`). |
-| `assets/environment.js` | Detects the live browser — viewport tier, pointer type, engine, feature support. |
-| `assets/scroll-hints.js` | Flags data tables that are actually scrolling sideways, so no column is silently clipped. |
-| `requirements.txt` / `requirements-dev.txt` | Deployment deps / notebook-only extras. |
-| `render.yaml`, `Procfile` | Deployment config for Render (see below). |
+| The 10-minute story | [`deliverables/AuroraCart_Executive_Story.pptx`](deliverables/) — 17 slides, timed speaker notes |
+| The interactive dashboard | `python app.py` → <http://127.0.0.1:8050> ([deploy it](docs/deployment.md)) |
+| The three recommendations | [docs/recommendations.md](docs/recommendations.md) |
+| The five mandatory questions | [docs/mandatory-questions.md](docs/mandatory-questions.md) |
+| How the numbers were defined | [docs/methodology.md](docs/methodology.md) |
+| Coverage against the assignment | [docs/case-brief.md](docs/case-brief.md) |
+| The full analysis, worked | [`notebooks/AuroraCart_EDA.ipynb`](notebooks/AuroraCart_EDA.ipynb) — pre-executed |
 
-## The business story
+---
 
-**Context.** AuroraCart's net revenue nearly doubled from 2023 to 2025 (₹29.3M → ₹58.1M).
+## Repository layout
 
-**Tension.** Profit did not keep pace: overall profit margin fell from **12.4% → 8.9% → 7.1%**
-over the same three years. Growth is being purchased, not earned for free.
+```
+.
+├── app.py                     WSGI entrypoint — `gunicorn app:server`, `python app.py`
+├── pyproject.toml             Package metadata; the single source of dependency truth
+├── render.yaml, Procfile      Free-tier deployment config
+│
+├── data/raw/                  The case dataset, as supplied
+├── notebooks/                 The EDA — data-quality audit through to findings
+│
+├── src/auroracart/
+│   ├── paths.py               Every filesystem location, resolved once
+│   ├── data_prep.py           The one cleaning + feature-engineering pipeline
+│   ├── analysis.py            Case-question metrics: drivers, event windows, decompositions
+│   ├── viz_theme.py           Shared Plotly palette and mark specs
+│   ├── responsive.py          Browser profile → figure adaptation
+│   ├── dashboard.py           Deliverable A — the five-page Dash app
+│   └── assets/                CSS + JS the dashboard auto-loads
+│
+├── tools/
+│   ├── build_figures.py       Renders the deck's charts to PNG
+│   └── build_deck.py          Builds the .pptx from those charts and computed facts
+│
+├── deliverables/              Deliverable B — the deck and its figures
+├── docs/                      The written deliverables (see the table above)
+└── tests/                     Cleaning contract, metric conventions, every dashboard tab
+```
+
+**The thing worth knowing about the structure:** the notebook, the dashboard, the
+deck and the docs all import from `src/auroracart/`. A number quoted on a slide is
+computed by the same function the dashboard draws and the notebook printed, so
+the three artifacts cannot drift apart. `tools/build_deck.py` does not contain a
+single typed-in figure — it reads `analysis.headline_facts()`.
+
+---
+
+## The evidence behind the answer
+
+**Context.** ₹130.8M net revenue and ₹11.6M contribution across 14,970 orders and
+6,778 customers, January 2023 – December 2025. Revenue grew 98%; margin went
+12.4% → 8.9% → 7.1%.
+
+**Tension.** Accelerate 2.0 (July 2024) grew revenue per month by 77% and
+contribution per month by 14%. Average discount went 11.0% → 14.9%.
 
 **Evidence, drilled down:**
-1. **Electronics** drives ~46% of revenue but runs at **−4.9% margin** — the single
-   largest category is losing money at scale.
-2. **Flash Deals** carry the deepest average discount (24%) and are the only promotion
-   type with **negative margin (−2.0%)**; no-promotion orders are the most profitable
-   demand AuroraCart has (15.2% margin).
-3. The **"Premium" customer segment** has the highest average order value but the
-   **lowest margin (2.9%)** of any segment — the label doesn't match the economics.
-4. **Paid acquisition** (Marketplace Ads, Paid Social) spends 6.9–8.6% of the revenue
-   it generates on marketing, compressing an already-thin margin further.
-5. **On-time delivery sits around 40–45%** company-wide regardless of fulfillment mode,
-   correlates with lower ratings (r ≈ −0.48), and **triples the complaint rate** on late
-   orders (12.4% vs 3.9%).
 
-**Recommendations** (ranked by expected impact, each tied to the evidence above):
-1. Re-price or re-cost Electronics at the subcategory level before scaling it further.
-2. Restructure or retire Flash Deals; protect the no-promotion demand base.
-3. Fix on-time delivery before spending more on customer acquisition.
+1. **The decline is rate erosion, not mix.** Holding the 2023 category mix
+   constant, 2025 margin would still be 7.6%. Mix explains −0.4 points of a −5.3
+   point fall; within-category erosion explains −4.7.
+2. **Electronics is the whole story.** 50.6% of revenue at −4.9% margin;
+   Smartphones alone are 31.2% of company revenue at −9.1%, losing ₹3.70M.
+   Merchandise cost is 94.1% of net revenue there, against 54–67% elsewhere.
+   Discount depth is within 0.3 points across all five categories, so this is a
+   cost problem, not a promotion problem.
+3. **Discount tolerance is category-specific.** Electronics crosses into loss
+   between a 10% and 15% discount; the rest of the business earns 10.5% even
+   above 25%. Flash Deals (24.1% average discount, 10.0% of revenue) are the only
+   promotion type at a negative margin.
+4. **Product mix outranks every other lens by ~20×.** Ranked by revenue-weighted
+   spread in margin: subcategory 15.1 points, category 14.2, price band 13.2 —
+   against region 0.8 and fulfilment mode 0.6. The leadership meeting was arguing
+   about the wrong variables.
+5. **The "Premium segment problem" is a mix artifact.** Premium's 2.9% pooled
+   margin becomes 21.9% outside Electronics — ordinary. 65.9% of its revenue is
+   Electronics. Any comparison here that does not control for category is a
+   category-mix comparison in disguise.
+6. **Delivery improved and nobody noticed.** The January 2025 logistics contract
+   took on-time delivery 34.4% → 55.0%, complaints 10.1% → 6.9%, ratings 4.15 →
+   4.27, for ~₹45 more per order. The 43% company-wide on-time figure that makes
+   delivery look broken is the average of a success and a recurring
+   October–November collapse, and describes neither.
 
-**Limitations:** synthetic dataset; returns are not netted out of `Net_Revenue`; no
-SKU-level cost breakdown to fully decompose *why* Electronics is unprofitable;
-delivery-delay → rating is a credible association, not proven causation. Full detail,
-with the numbers behind each claim, is in the notebook (§9–11).
+**What this cannot conclude:** returns are not netted out of `Net_Revenue`, so
+every margin is an upper bound; there is no SKU-level cost detail, so we can
+prove Electronics loses money but not whether the fix is procurement or pricing;
+the delivery-to-rating link is a credible association, not causation; and
+order-level data has no lifetime view, which is the main reason the acquisition
+recommendation ranks third. Full statement in
+[docs/reflection.md](docs/reflection.md).
 
-## Phones, tablets and browsers
+---
 
-The dashboard is built to be used on a phone, not merely to survive on one. It
-was verified end-to-end on emulated iPhone SE / 14 Pro, Pixel 7, Galaxy S9+,
-iPad Mini (portrait and landscape), a 320px-wide viewport, and desktop — every
-tab, on each — with no horizontal page scroll, no clipped chart text, and no tap
-target under 44px.
-
-Adaptation happens in three layers, which is worth knowing before changing any
-of it:
-
-1. **CSS media queries** (`assets/style.css`) own the page layout: grid
-   stacking, type scale, tap targets, the collapsible filter panel. This layer
-   works with JavaScript disabled.
-2. **Browser detection** (`assets/environment.js`) measures what a media query
-   cannot express — pointer type, browser engine, `dvh`/`clamp`/safe-area
-   support, standalone (home-screen) mode — and stamps it on `<html>` as `env-*`
-   classes, then reports it into a `dcc.Store`.
-3. **Figure adaptation** (`responsive.py`) consumes that report for the things
-   locked inside a server-rendered Plotly figure: axis margins, tick-label
-   truncation and wrapping, title wrapping, histogram bin counts, and table page
-   size.
-
-What that buys on a small screen:
-
-- Charts go one-up below `lg`; category labels are truncated (horizontal bars)
-  or wrapped over two lines (vertical bars), with the full text always present
-  in the hover and in the plain-table twin beneath.
-- **Dragging a chart scrolls the page** instead of panning the axes — Plotly's
-  drag mode is switched off wherever the primary pointer is coarse, which is the
-  single worst Dash-on-mobile failure mode.
-- The date picker drops to a one-month, full-screen calendar; a two-month
-  inline calendar is ~600px wide and gets clipped by any phone viewport.
-- Filters collapse behind a toggle that reports how many are active, so a
-  collapsed panel never hides a live filter.
-- Tables that really are wider than their box say so and scroll in place.
-- Pinch-zoom is deliberately left enabled (no `maximum-scale`), per WCAG 2.1
-  SC 1.4.4.
-
-Detection is progressive enhancement throughout: if the JavaScript never reports
-in, `responsive.py` falls back to a desktop profile and the CSS layer still lays
-the page out correctly. The footer prints what was actually detected, which is
-the first thing to check if a layout looks wrong on an unfamiliar device.
-
-## Running locally
+## Running it
 
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 
 # Dashboard only:
 pip install -r requirements.txt
-python dashboard.py              # http://127.0.0.1:8050
+python app.py                      # http://127.0.0.1:8050
 
-# Notebook (adds Jupyter on top of the dashboard deps):
+# Everything — notebook, tests, and the deliverable build chain:
 pip install -r requirements-dev.txt
-jupyter notebook AuroraCart_EDA.ipynb
+jupyter notebook notebooks/AuroraCart_EDA.ipynb
+pytest
 ```
 
-## Deploying the dashboard for free — Render
+Rebuilding the deck after a data or analysis change:
 
-**Why Render:** the dashboard is a Dash app, i.e. a standard Flask/WSGI Python web
-service — that's exactly what Render's free **Web Service** tier is built for: connect
-a GitHub repo, it detects Python, runs `gunicorn`, and gives you a public HTTPS URL,
-no credit card and no Dockerfile required. (Streamlit Community Cloud isn't an option
-here since this dashboard is deliberately built in Dash, not Streamlit; Hugging Face
-Spaces would work too but needs a Dockerfile for a non-Streamlit/Gradio app, which is
-more setup for the same result.)
+```bash
+python tools/build_figures.py      # -> deliverables/figures/*.png
+python tools/build_deck.py         # -> deliverables/AuroraCart_Executive_Story.pptx
+```
 
-The one trade-off: Render's **free** tier spins the service down after ~15 minutes of
-no traffic, so the *first* request after a quiet period takes ~30–50 seconds to wake
-up. Open the link a few minutes before you need it (e.g. before your presentation) and
-it'll be instant from then on.
+Both are pure functions of the dataset — rerunning them with new data produces a
+deck whose numbers and prose match it.
 
-### Steps
+---
 
-1. **Push this repo to GitHub** (already done if you're reading this from the repo).
-2. Go to **[render.com](https://render.com)** → sign up / log in with GitHub — free,
-   no card needed.
-3. Click **New +** → **Blueprint**, and point it at this repository. Render will read
-   `render.yaml` automatically and pre-fill everything (service name, build command
-   `pip install -r requirements.txt`, start command
-   `gunicorn dashboard:server --workers 2 --timeout 120`, free plan).
-   - *No Blueprint option, or prefer manual setup?* Use **New +** → **Web Service**
-     instead, pick this repo, and set:
-     - **Runtime:** Python 3
-     - **Build Command:** `pip install -r requirements.txt`
-     - **Start Command:** `gunicorn dashboard:server --workers 2 --timeout 120`
-     - **Instance Type:** Free
-4. Click **Deploy**. First deploy takes a few minutes (installing pandas/numpy/plotly).
-5. Once it's live, Render gives you a URL like `https://auroracart-dashboard.onrender.com`
-   — that's your shareable, always-on (with the cold-start caveat above) dashboard link.
-6. Every future `git push` to the connected branch auto-redeploys.
+## Design and engineering notes
 
-No other free service was materially better for this specific app: Streamlit Cloud
-only hosts Streamlit apps; Hugging Face Spaces needs a Dockerfile for Dash; Railway and
-Fly.io both dropped their no-card free tiers. Render's Python web service is the
-simplest path from "Dash app in a repo" to "public URL" without extra config files
-beyond what's already in this repo.
+- **[docs/visual-design.md](docs/visual-design.md)** — the form heuristic, the
+  colour-by-job rules, the validator output for the palette (including two hard
+  colourblindness failures it caught that inspection did not), mark specs, and
+  the anti-patterns each chart was checked against.
+- **[docs/responsive-design.md](docs/responsive-design.md)** — the three-layer
+  approach that makes the dashboard genuinely usable on a phone, verified across
+  emulated devices down to a 320px viewport.
+- **[docs/deployment.md](docs/deployment.md)** — free hosting on Render, and why
+  not the alternatives.
+
+---
+
+*The case and its dataset are fictional and synthetic, designed for classroom
+use. The rupee figures describe that fiction; the method is what transfers.*

@@ -325,7 +325,7 @@ def render_overview(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
         .reset_index()
     )
 
-    # --- Monthly Net Revenue: single-series trend -> sequential blue, ~10% wash + 2px line.
+    # --- Monthly Net Revenue: single-series trend -> sequential blue, ~18% wash + 2px line.
     fig_rev = px.area(monthly, x="Order_YearMonth", y="Net_Revenue", title="Monthly Net Revenue",
                        color_discrete_sequence=[C_REVENUE])
     wash_area(fig_rev, C_REVENUE)
@@ -384,7 +384,7 @@ def render_overview(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
     story = dbc.Alert(
         [
             html.B("The story: "),
-            "Revenue is growing, but margin is not keeping pace — and in this filtered view it stands at ",
+            "Revenue is growing, but margin is not keeping pace. In this filtered view it stands at ",
             html.B(f"{margin:.1f}%"),
             ". Use the Profitability tab to see which categories and promotions are driving that down.",
         ],
@@ -485,7 +485,7 @@ def render_profitability(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
     seg["Margin_Label"] = seg["Margin_Pct"].apply(lambda v: f"{v:.1f}%")
 
     # --- Segment AOV: nominal category, magnitude -> flat blue (revenue-family), value at tip.
-    fig_seg = px.bar(seg, x="Customer_Segment", y="AOV", title="Customer Segment — Average Order Value",
+    fig_seg = px.bar(seg, x="Customer_Segment", y="AOV", title="Customer Segment: Average Order Value",
                       color_discrete_sequence=[C_REVENUE], text="AOV_Label")
     fig_seg.update_traces(textposition="outside", textfont_color=INK["secondary"], hovertemplate=money_hover("Segment"))
     style_bars(fig_seg)
@@ -496,7 +496,7 @@ def render_profitability(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
     # --- Segment Margin: same nominal axis -> flat green (profit-family), NOT a value ramp
     # (ramping color by the same value the bar height already shows double-encodes on a
     # category with no natural order — the anti-pattern this palette explicitly forbids).
-    fig_seg_margin = px.bar(seg, x="Customer_Segment", y="Margin_Pct", title="Customer Segment — Profit Margin",
+    fig_seg_margin = px.bar(seg, x="Customer_Segment", y="Margin_Pct", title="Customer Segment: Profit Margin",
                              color_discrete_sequence=[C_PROFIT], text="Margin_Label")
     fig_seg_margin.update_traces(textposition="outside", textfont_color=INK["secondary"], hovertemplate=pct_hover("Segment"))
     style_bars(fig_seg_margin)
@@ -632,7 +632,7 @@ def render_operations(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
     fig_ops.update_layout(title="On-Time Delivery Rate by Fulfillment Mode", xaxis_title=None,
                            yaxis_title="On-Time Rate (%)", yaxis=dict(range=[0, 118]), bargap=0.38, showlegend=False)
     finalize(fig_ops, height=340)
-    ops_legend = status_legend((STATUS["critical"], "Below 50%"), (STATUS["warning"], "50–75%"), (STATUS["good"], "75%+"))
+    ops_legend = status_legend((STATUS["critical"], "Below 50%"), (STATUS["warning"], "50-75%"), (STATUS["good"], "75%+"))
 
     # --- Complaint rate: exactly 2 states, both genuinely good/bad -> canonical status use.
     complaint = dff.groupby("On_Time_Flag")["Complaint_Flag"].mean() * 100
@@ -671,7 +671,7 @@ def render_operations(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
     # event marker that make them unmissable.
     monthly_ops = A.monthly_operations(dff).reset_index()
     fig_ontime = px.line(monthly_ops, x="Order_YearMonth", y="On_Time_Pct", markers=True,
-                          title="On-Time Rate by Month — the average hides two stories",
+                          title="On-Time Rate by Month: the average hides two stories",
                           color_discrete_sequence=[C_REVENUE])
     style_line(fig_ontime)
     fig_ontime.update_traces(hovertemplate="<b>%{y:.1f}%</b> on time<br>%{x|%b %Y}<extra></extra>")
@@ -684,7 +684,7 @@ def render_operations(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
     fig_ontime.update_layout(xaxis_title=None, yaxis_title="On-Time Rate (%)",
                               yaxis=dict(range=[0, 100]), margin=dict(r=45))
     finalize(fig_ontime, height=320)
-    ontime_legend = status_legend((STATUS["critical"], "Shaded: Oct–Nov festive peak"))
+    ontime_legend = status_legend((STATUS["critical"], "Shaded: Oct-Nov festive peak"))
 
     kpi_col = {"xs": 6, "md": 3}
     cards = dbc.Row([
@@ -756,7 +756,7 @@ def render_decision(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
     side = (banded.groupby(["Side", "Discount_Band"], observed=True)[["Revenue", "Profit"]].sum()
             .assign(Margin_Pct=lambda d: d["Profit"] / d["Revenue"] * 100).reset_index())
     fig_bands = px.line(side, x="Discount_Band", y="Margin_Pct", color="Side", markers=True,
-                        title="Margin by discount depth — the ceiling is category-specific",
+                        title="Margin by discount depth: the ceiling is category-specific",
                         color_discrete_sequence=[CATEGORICAL[0], CATEGORICAL[1]],
                         category_orders={"Discount_Band": A.DISCOUNT_BAND_LABELS,
                                          "Side": ["Rest of business", "Electronics"]})
@@ -776,7 +776,7 @@ def render_decision(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
     # Deliberately grey: this is the view being rejected, and giving it an identity
     # hue would collide with the two series that Exhibit B uses to correct it.
     fig_pooled = px.bar(confound, x="Customer_Segment", y="Margin_Pooled",
-                        title="Exhibit A — margin by segment (pooled)",
+                        title="Exhibit A: margin by segment (pooled)",
                         color_discrete_sequence=[INK["muted"]], text="Label")
     fig_pooled.update_traces(textposition="outside", textfont_color=INK["secondary"],
                              hovertemplate=pct_hover("Segment"))
@@ -793,7 +793,7 @@ def render_decision(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
     split["Basket"] = split["Basket"].map({"Margin_In_Electronics": "Electronics orders",
                                             "Margin_Ex_Electronics": "Everything else"})
     fig_split = px.bar(split, x="Customer_Segment", y="Margin_Pct", color="Basket", barmode="group",
-                       title="Exhibit B — the same segments, split by what they bought",
+                       title="Exhibit B: the same segments, split by what they bought",
                        color_discrete_sequence=[CATEGORICAL[0], CATEGORICAL[1]],
                        category_orders={"Basket": ["Everything else", "Electronics orders"]})
     fig_split.update_traces(hovertemplate="<b>%{y:.1f}%</b> margin<br>%{x} · %{fullData.name}<extra></extra>")
@@ -808,7 +808,7 @@ def render_decision(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
             html.B("How to read the pair: "),
             "Exhibit A is accurate and would send us after the Premium segment. Exhibit B "
             "shows Premium's margin is ordinary once you separate Electronics from everything "
-            "else — it simply buys Electronics more than any other segment does. The problem "
+            "else. It simply buys Electronics more than any other segment does. The problem "
             "is the product, not the customer, and only the split view says so.",
         ],
         color="light", className="story-callout",
@@ -818,12 +818,12 @@ def render_decision(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
         dbc.Col(recommendation_card(
             1, "Re-cost and re-price Electronics before scaling it",
             "Electronics is half of revenue at a negative margin, and merchandise cost alone "
-            "eats 94% of what those orders recognise — Smartphones account for most of it.",
+            "eats 94% of what those orders recognise. Smartphones account for most of it.",
             "Bringing Electronics to break-even recovers the largest single pool of lost "
             "contribution in the dataset without touching demand elsewhere.",
             "Electronics drives traffic and basket-building; repricing it may cost volume and "
             "the attached sales that come with it.",
-            "SKU-level cost and competitor price data — the dataset cannot say whether this is "
+            "SKU-level cost and competitor price data. The dataset cannot say whether this is "
             "a procurement problem or a pricing one.",
             STATUS["critical"]), md=4),
         dbc.Col(recommendation_card(
@@ -835,7 +835,7 @@ def render_decision(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
             "pricing system next quarter, not a strategic bet.",
             "Promotion is partly defensive; withdrawing Flash Deals may shift volume to "
             "competitors or simply move it to other discounts.",
-            "Promotion-level incrementality — the dataset shows what promoted orders earned, "
+            "Promotion-level incrementality: the dataset shows what promoted orders earned, "
             "not what would have happened without the promotion.",
             STATUS["serious"]), md=4),
         dbc.Col(recommendation_card(
@@ -863,7 +863,7 @@ def render_decision(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
             [html.B("Three actions, in priority order. "),
              "Each is sized by the contribution it puts at stake, and each names the one piece "
              "of information we would want before committing. Recommendations were framed on the "
-             "full Jan 2023 – Dec 2025 period; the charts below follow your filters."],
+             "full Jan 2023 to Dec 2025 period; the charts below follow your filters."],
             color="light", className="story-callout"),
         cards,
         dbc.Row([dbc.Col(graph(fig_drivers, view), **CHART_COL, className="chart-cell"),
@@ -901,13 +901,13 @@ app = dash.Dash(
         # No `maximum-scale` / `user-scalable=no`: pinch-zoom stays available.
         # Suppressing it would fail WCAG 2.1 SC 1.4.4 (Resize Text).
         {"name": "description",
-         "content": "AuroraCart profitability & operations diagnostic — revenue, margin, "
+         "content": "AuroraCart profitability & operations diagnostic: revenue, margin, "
                     "customers and delivery performance, Jan 2023 to Dec 2025."},
-        {"name": "theme-color", "content": "#f9f9f7"},
-        {"name": "color-scheme", "content": "light"},
+        {"name": "theme-color", "content": "#0d0d0d"},
+        {"name": "color-scheme", "content": "dark"},
         {"name": "mobile-web-app-capable", "content": "yes"},
         {"name": "apple-mobile-web-app-capable", "content": "yes"},
-        {"name": "apple-mobile-web-app-status-bar-style", "content": "default"},
+        {"name": "apple-mobile-web-app-status-bar-style", "content": "black-translucent"},
         {"name": "apple-mobile-web-app-title", "content": "AuroraCart"},
         # Stops iOS Safari turning order counts and dates into blue "call" links.
         {"name": "format-detection", "content": "telephone=no"},
@@ -920,7 +920,7 @@ server = app.server  # exposed for gunicorn via the root `app.py`: `gunicorn app
 # <head> so the page never flashes a desktop-shaped layout on a phone;
 # assets/environment.js then takes over and replaces these with the full set.
 app.index_string = """<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
     <head>
         {%metas%}
         <title>{%title%}</title>
@@ -946,8 +946,8 @@ app.index_string = """<!DOCTYPE html>
     </head>
     <body>
         <noscript>
-          <div style="margin:12px;padding:12px;border:1px solid #c3c2b7;border-radius:10px;
-                      font-family:system-ui,sans-serif;font-size:13px;background:#fcfcfb">
+          <div style="margin:12px;padding:12px;border:1px solid #383835;border-radius:10px;
+                      font-family:system-ui,sans-serif;font-size:13px;background:#1a1a19;color:#c3c2b7">
             This dashboard needs JavaScript for its charts and filters. The layout below is
             still responsive, but the interactive views will not load.
           </div>
@@ -1026,8 +1026,8 @@ app.layout = dbc.Container(
                 html.Div("AC", className="brand-mark"),
                 html.Div([
                     html.H1("AuroraCart at a Crossroads", className="page-title"),
-                    html.P("Revenue is growing — is value? A profitability & operations diagnostic, "
-                           "Jan 2023 – Dec 2025.", className="page-subtitle"),
+                    html.P("Revenue is growing. Is value? A profitability & operations diagnostic, "
+                           "Jan 2023 to Dec 2025.", className="page-subtitle"),
                 ]),
             ],
             className="header",

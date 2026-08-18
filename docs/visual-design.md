@@ -1,4 +1,4 @@
-# Visual design — how every chart here was built
+# Visual design: how every chart here was built
 
 The case brief (§17) judges a visualization by "how accurately and efficiently it
 communicates the intended comparison", and warns that an attractive chart is not
@@ -10,6 +10,14 @@ The procedure is: **pick the form from the data's job → assign colour by the j
 the colour does → validate the palette with a script → apply mark specs → add the
 interaction layer → accessibility pass → render it and look at it.** Colour comes
 last, deliberately.
+
+The whole system is dark: a `#0d0d0d` page plane, a `#1a1a19` chart surface, and
+a palette stepped for that surface. The deck's content slides use the exact
+chart-surface colour so the rendered figures blend into the slide without a
+visible rectangle. One ornament repeats across the dashboard and the deck: a
+short blue-to-violet gradient rule drawn from two of the palette's own slots
+(#3987e5 → #9085e9), used on the dashboard's brand mark and header and on the
+deck's headline rules, and nowhere else.
 
 ---
 
@@ -26,9 +34,9 @@ last, deliberately.
 | Two variables plus magnitude | Bubble scatter, direct-labelled | Discount depth vs margin by promotion |
 | A single headline number | Stat tile, not a chart | The KPI strip |
 
-Two forms were rejected on purpose. **A pie for category revenue share** — the
-comparison is between close values, which a pie cannot support; it is a bar.
-**A dual-axis revenue-and-margin chart** — the crossing point of two arbitrary
+Two forms were rejected on purpose. **A pie for category revenue share**: the
+comparison is between close values, which a pie cannot support, so it is a bar.
+**A dual-axis revenue-and-margin chart**: the crossing point of two arbitrary
 scales invents a relationship that is not in the data, so the deck's opening
 chart is two stacked panels sharing one time axis instead.
 
@@ -42,14 +50,20 @@ Five distinct colour jobs appear, and each has one rule:
 |---|---|---|
 | **Categorical** (identity) | Fixed hue order, assigned in sequence, never cycled | Before/after series; Electronics vs rest |
 | **Ordinal** (position in a sequence) | One hue, monotone lightness | Loyalty status New → Champion |
-| **Sequential** (magnitude) | One hue, light → dark | Revenue-family fills |
+| **Sequential** (magnitude) | One hue, stepped toward the surface at the low end | Revenue-family fills |
 | **Diverging** (polarity) | Two opposed hues + neutral midpoint | Margin crossing zero |
 | **Status** (state) | Reserved tokens, always with an icon or label | On-time bands, complaint rate |
 
 Semantic roles are held constant everywhere so hue itself carries meaning across
 the whole system: **revenue reads blue, cost orange, profit green, friction
-violet** — never reassigned per chart on looks. Colour follows the entity, so
+violet**, never reassigned per chart on looks. Colour follows the entity, so
 filtering a series out never repaints the survivors.
+
+On a dark surface the ramp directions flip: the sequential blue runs dark to
+light so that "more" reads as brighter, the diverging arms brighten toward
+their poles while the midpoint recedes to a near-surface grey (#383835), and
+the ordinal ramp's surface-nearest step stays above 2:1 contrast so the first
+loyalty tier does not vanish into the background.
 
 The rule broken most often in practice, and avoided here: **a value-ramp on
 nominal categories**. Colouring bars darker-where-bigger on categories with no
@@ -62,32 +76,38 @@ only genuinely ordered ones (loyalty status) get a ramp.
 ## 3. The palette was validated, not eyeballed
 
 The eight-slot categorical palette in
-[`src/auroracart/viz_theme.py`](../src/auroracart/viz_theme.py) was run through
-the palette validator against the light chart surface `#fcfcfb`:
+[`src/auroracart/viz_theme.py`](../src/auroracart/viz_theme.py) is the dark-mode
+stepping of a documented reference palette: the same eight hues, each re-stepped
+into the OKLCH lightness band that stays readable on a dark surface. It is not a
+brightness flip of the light palette; the light hues would fail contrast on
+`#1a1a19`. The set was run through the palette validator against the actual
+chart surface:
 
 ```
-Palette (light, surface #fcfcfb, categorical): 8 slots
-  [PASS] Lightness band      all 8 inside L 0.43–0.77
-  [PASS] Chroma floor        all 8 >= 0.1
-  [PASS] CVD separation      worst adjacent #eda100↔#1baf7a ΔE 9.1 (protan)
-  [PASS] Normal-vision floor worst adjacent #e87ba4↔#eda100 ΔE 19.6
-  [WARN] Contrast vs surface below 3:1 for 3 slots — relief required
+Palette (dark, surface #1a1a19, categorical): 8 slots
+  [PASS] Lightness band         all 8 inside L 0.48-0.67
+  [PASS] Chroma floor           all 8 >= 0.1
+  [PASS] CVD separation         worst adjacent #c98500↔#199e70 ΔE 8.4 (protan) · tritan 8.7
+  [PASS] Normal-vision floor    worst adjacent #d55181↔#c98500 ΔE 19.3 (normal)
+  [PASS] Contrast vs surface    all 8 >= 3:1
 ```
 
-The contrast WARN is not dismissable; it obliges a relief channel. Every chart
-here ships one: direct value labels on the marks, and a plain-table twin beneath
-every chart group in the dashboard.
+All five checks pass on the dark surface, including the contrast check that the
+light palette could only satisfy with a relief channel. The relief channel is
+kept anyway: direct value labels on the marks, and a plain-table twin beneath
+every chart group in the dashboard, because a value should never be reachable
+only through colour or hover.
 
-**Two hard failures the validator caught, and what changed:**
+**Two hard failures the validator caught in earlier design passes, and what
+changed:**
 
 1. **The waterfall's green/red gain-loss pair** measured ΔE 4.1 under
-   deuteranopia — effectively one colour for ~5% of male readers. Replaced with
-   the diverging blue/red poles (ΔE 20.4 protan, 30.8 normal).
+   deuteranopia, effectively one colour for ~5% of male readers. Replaced with
+   the diverging blue/red poles.
 2. **The cost stack's pink segment next to its orange one** measured ΔE 12.9
-   under *normal* vision, below the 15 floor — a pair full-colour readers
+   under *normal* vision, below the 15 floor: a pair full-colour readers
    struggle with, which secondary encoding does not excuse. Replaced with the
-   palette's first four slots in fixed order (worst adjacent pair ΔE 22.9
-   normal, 9.1 protan).
+   palette's first four slots in fixed order.
 
 Both were invisible to inspection and would have shipped without the script.
 
@@ -97,7 +117,7 @@ Both were invisible to inspection and would have shipped without the script.
 
 Held constant so no chart free-hands its own: 4px rounded bar ends anchored to
 the baseline, 2px lines, ≥8px markers with a 2px surface ring, a 2px surface gap
-between stacked segments (the surface separates fills — never a drawn border),
+between stacked segments (the surface separates fills, never a drawn border),
 recessive hairline gridlines one shade off the surface, and generous bar gaps.
 
 Labelling is selective, not universal. A number on every point is chaos; the
@@ -108,7 +128,7 @@ Dashes are reserved for meaning: a dashed vertical rule marks a dated
 intervention (Accelerate 2.0, the logistics contract), a dashed horizontal rule
 marks a threshold (break-even, the on-time target). Gridlines are never dashed.
 
-Text wears text tokens — values, labels and legends stay in primary, secondary
+Text wears text tokens. Values, labels and legends stay in primary, secondary
 or muted ink, and the coloured mark beside them carries the identity. Series
 colour is never used for the text describing it.
 
@@ -120,16 +140,18 @@ sees only the slide still gets the point.
 
 ## 5. Interaction, and where it is *not* used
 
-One filter row scopes every page — date range, region, category, segment,
-fulfilment mode — never per-chart filters inside a card. Hover tooltips lead with
-the value and carry the full label even when the axis had to shorten it.
+One filter row scopes every page (date range, region, category, segment,
+fulfilment mode), never per-chart filters inside a card. Hover tooltips lead
+with the value, sit on an elevated dark surface (#242422) with a hairline ring
+so they separate from the chart beneath, and carry the full label even when the
+axis had to shorten it.
 
 Tooltips enhance and never gate: every value is also reachable from a direct
 label or the table twin, which is what makes the dashboard usable with a keyboard
 and on a phone where hover does not exist.
 
 On touch devices Plotly's drag-to-pan is switched off entirely, so dragging a
-chart scrolls the page instead of panning the axes — the single worst
+chart scrolls the page instead of panning the axes, the single worst
 Dash-on-mobile failure mode. The full layering is documented in
 [responsive-design.md](responsive-design.md).
 
@@ -141,14 +163,14 @@ Dash-on-mobile failure mode. The full layering is documented in
   up to four are also direct-labelled. Status colours always ship with an icon or
   a caption chip, never hue by itself.
 - **Every chart has a table twin.** Each dashboard page ends with a plain
-  `DataTable` carrying the numbers behind the charts above it — the WCAG-clean
+  `DataTable` carrying the numbers behind the charts above it, the WCAG-clean
   equivalent, and on a phone the place where any truncated category label still
   appears in full.
 - **Pinch-zoom stays enabled** (no `maximum-scale`), per WCAG 2.1 SC 1.4.4.
 - **Tap targets are ≥44px**, verified across emulated phones and tablets.
-- **The palette is fixed light-surface** and declares `color-scheme: light`, so
-  Chrome for Android's auto-dark cannot re-render it into an unvalidated inverted
-  palette the validator never saw.
+- **The palette is fixed dark-surface** and declares `color-scheme: dark`, which
+  keeps native controls and browser chrome matched to the page and prevents any
+  auto-darkening pass from re-rendering a palette the validator never saw.
 
 ---
 
@@ -156,7 +178,10 @@ Dash-on-mobile failure mode. The full layering is documented in
 
 The validator checks colour, not layout. Every deck figure was rendered to PNG
 and inspected for label collisions, clipped in-segment labels, legends landing on
-titles, and notes running off the canvas — several of which were found and fixed
-that way, including in-segment labels being squeezed into unreadable slivers on
-the narrowest cost-stack segments (now suppressed below a width threshold, with
-the value kept in the hover and the table).
+titles, and notes running off the canvas. Several such problems were found and
+fixed that way, including in-segment labels being squeezed into unreadable
+slivers on the narrowest cost-stack segments (now suppressed below a width
+threshold, with the value kept in the hover and the table). The dark conversion
+got the same treatment: figures re-rendered and re-inspected on the dark
+surface, with the area-fill wash raised from 12% to 18% opacity because the
+lighter wash disappeared against the dark background.

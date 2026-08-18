@@ -24,7 +24,7 @@ deck's headline rules, and nowhere else.
 ## 1. Form follows the job
 
 | The chart's job | Form used | Where |
-|---|---|---|
+| --- | --- | --- |
 | Magnitude on a nominal axis | Horizontal bar, sorted, value at tip | Revenue by category, driver ranking |
 | Polarity around a baseline | Diverging-coloured bar with a zero rule | Margin by category |
 | Change over time | Line with markers; area for a single revenue series | Monthly revenue, margin, on-time |
@@ -47,7 +47,7 @@ chart is two stacked panels sharing one time axis instead.
 Five distinct colour jobs appear, and each has one rule:
 
 | Job | Encoding | Example |
-|---|---|---|
+| --- | --- | --- |
 | **Categorical** (identity) | Fixed hue order, assigned in sequence, never cycled | Before/after series; Electronics vs rest |
 | **Ordinal** (position in a sequence) | One hue, monotone lightness | Loyalty status New → Champion |
 | **Sequential** (magnitude) | One hue, stepped toward the surface at the low end | Revenue-family fills |
@@ -83,7 +83,7 @@ brightness flip of the light palette; the light hues would fail contrast on
 `#1a1a19`. The set was run through the palette validator against the actual
 chart surface:
 
-```
+```text
 Palette (dark, surface #1a1a19, categorical): 8 slots
   [PASS] Lightness band         all 8 inside L 0.48-0.67
   [PASS] Chroma floor           all 8 >= 0.1

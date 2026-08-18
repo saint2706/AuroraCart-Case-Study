@@ -19,8 +19,8 @@ categories AuroraCart already sold, not a shift in what it sells.** It is
 concentrated almost entirely in Electronics, which is half of revenue at −4.9%
 margin because merchandise alone costs 94% of what those orders recognise.
 Meanwhile one company-wide discount policy is being applied to two businesses
-with completely different tolerance for it: Electronics turns loss-making above a
-10% discount, while the rest of the business still earns double digits at 25%
+with completely different tolerance for it: Electronics turns loss-making above
+a 10% discount, while the rest of the business still earns double digits at 25%
 off. The delivery function everyone assumed was broken is the one thing that
 measurably improved.
 
@@ -32,7 +32,7 @@ Three actions follow, in priority order. They are in
 ## Start here
 
 | If you want… | Go to |
-|---|---|
+| --- | --- |
 | The 10-minute story | [`deliverables/AuroraCart_Executive_Story.pptx`](deliverables/): 17 dark slides, timed speaker notes |
 | The interactive dashboard | `python app.py` → <http://127.0.0.1:8050> ([deploy it](docs/deployment.md)) |
 | The three recommendations | [docs/recommendations.md](docs/recommendations.md) |
@@ -45,10 +45,10 @@ Three actions follow, in priority order. They are in
 
 ## Repository layout
 
-```
+```text
 .
 ├── app.py                     WSGI entrypoint: `gunicorn app:server`, `python app.py`
-├── pyproject.toml             Package metadata; the single source of dependency truth
+├── pyproject.toml             Package metadata; the dependency source of truth
 ├── render.yaml, Procfile      Free-tier deployment config
 │
 ├── data/raw/                  The case dataset, as supplied
@@ -69,14 +69,14 @@ Three actions follow, in priority order. They are in
 │
 ├── deliverables/              Deliverable B: the deck and its figures
 ├── docs/                      The written deliverables (see the table above)
-└── tests/                     Cleaning contract, metric conventions, every dashboard tab
+└── tests/                     Cleaning contract, metrics, every dashboard tab
 ```
 
-**The thing worth knowing about the structure:** the notebook, the dashboard, the
-deck and the docs all import from `src/auroracart/`. A number quoted on a slide is
-computed by the same function the dashboard draws and the notebook printed, so
-the three artifacts cannot drift apart. `tools/build_deck.py` does not contain a
-single typed-in figure; it reads `analysis.headline_facts()`.
+**The thing worth knowing about the structure:** the notebook, the dashboard,
+the deck and the docs all import from `src/auroracart/`. A number quoted on a
+slide is computed by the same function the dashboard draws and the notebook
+printed, so the three artifacts cannot drift apart. `tools/build_deck.py` does
+not contain a single typed-in figure; it reads `analysis.headline_facts()`.
 
 ---
 

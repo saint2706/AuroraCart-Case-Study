@@ -24,7 +24,7 @@ from typing import Any
 
 import plotly.graph_objects as go
 
-from viz_theme import INK
+from auroracart.viz_theme import INK
 
 # Bootstrap 5 grid tiers, in the order the JS resolves them. Keep this table and
 # the TIERS table in assets/environment.js identical — they are one contract.

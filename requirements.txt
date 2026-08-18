@@ -1,6 +1,4 @@
-dash==4.4.1
-dash-bootstrap-components==2.0.4
-plotly==6.9.0
-pandas==3.0.5
-numpy==2.4.6
-gunicorn==26.0.0
+# Runtime dependencies for the dashboard (Deliverable A).
+# The pinned versions live in pyproject.toml — this file installs the project
+# itself so `pip install -r requirements.txt` (Render's build command) works.
+-e .

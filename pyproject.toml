@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "auroracart"
+version = "1.0.0"
+description = "AuroraCart at a Crossroads — profitability & operations diagnostic, dashboard and executive story."
+readme = "README.md"
+requires-python = ">=3.11"
+
+# Single source of truth for dependencies. requirements.txt / requirements-dev.txt
+# are thin wrappers around these lists so `pip install -r ...` deploy flows still work.
+dependencies = [
+    "dash==4.4.1",
+    "dash-bootstrap-components==2.0.4",
+    "plotly==6.9.0",
+    "pandas==3.0.5",
+    "numpy==2.4.6",
+    "gunicorn==26.0.0",
+]
+
+[project.optional-dependencies]
+# Notebook + deliverable build chain. Not needed to run or deploy the dashboard.
+dev = [
+    "jupyter",
+    "nbformat",
+    "nbclient",
+    "ipykernel",
+    "kaleido",
+    "python-pptx",
+    "pytest",
+]
+
+[project.scripts]
+auroracart-dashboard = "auroracart.dashboard:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+auroracart = ["assets/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tools", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

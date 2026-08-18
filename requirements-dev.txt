@@ -1,6 +1,3 @@
-# Extra dependencies to run AuroraCart_EDA.ipynb locally (not needed to run/deploy the dashboard).
--r requirements.txt
-jupyter
-nbformat
-nbclient
-ipykernel
+# Everything in requirements.txt, plus Jupyter (for notebooks/AuroraCart_EDA.ipynb)
+# and the deliverable build chain (kaleido for chart PNGs, python-pptx for the deck).
+-e .[dev]

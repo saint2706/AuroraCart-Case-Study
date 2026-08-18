@@ -9,7 +9,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-RAW_PATH = Path(__file__).parent / "data-AuroraCart.csv"
+from auroracart.paths import RAW_DATA_PATH
+
+RAW_PATH = RAW_DATA_PATH
 
 # Free-text values that mean the same thing but were typed inconsistently at source.
 _CATEGORY_FIX = {

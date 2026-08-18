@@ -52,7 +52,7 @@ different projects with three different owners.
 AuroraCart has been setting it company-wide. Margin by discount band:
 
 | Discount applied | Electronics | Rest of business |
-|---|---|---|
+| --- | --- | --- |
 | 0-5% | +7.9% | +30.7% |
 | 5-10% | +3.1% | +27.7% |
 | **10-15%** | **−3.0%** | +24.4% |
@@ -96,7 +96,7 @@ contribution per month rose 14%. Channel margins after the programme, against
 what each channel spends on marketing per rupee of revenue it earns:
 
 | Channel | Margin before | Margin after | Marketing cost / revenue | Revenue share |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | Marketplace Ads | 5.1% | **1.2%** | 9.0% | 14.3% |
 | Paid Social | 7.9% | **3.9%** | 7.2% | 23.9% |
 | Email | 12.7% | 9.0% | 1.3% | 8.4% |

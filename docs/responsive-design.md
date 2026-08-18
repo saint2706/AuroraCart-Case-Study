@@ -12,8 +12,8 @@ of it:
 1. **CSS media queries** (`src/auroracart/assets/style.css`) own the page
    layout: grid stacking, type scale, tap targets, the collapsible filter panel.
    This layer works with JavaScript disabled.
-2. **Browser detection** (`src/auroracart/assets/environment.js`) measures what a
-   media query cannot express (pointer type, browser engine, `dvh`/`clamp`/
+2. **Browser detection** (`src/auroracart/assets/environment.js`) measures what
+   a media query cannot express (pointer type, browser engine, `dvh`/`clamp`/
    safe-area support, standalone home-screen mode), stamps it on `<html>` as
    `env-*` classes, then reports it into a `dcc.Store`.
 3. **Figure adaptation** (`src/auroracart/responsive.py`) consumes that report

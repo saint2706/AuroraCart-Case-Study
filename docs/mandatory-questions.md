@@ -27,7 +27,7 @@ with completely different tolerance for it.
 **The five primary visuals**, in the order I would show them:
 
 | # | Visual | What it establishes |
-|---|---|---|
+| --- | --- | --- |
 | 1 | `01_growth_vs_margin` | Revenue +98% while margin fell 12.4% → 7.1%. The tension. |
 | 2 | `03_margin_decomposition` | 92% of the fall is within-category erosion, not mix shift. Kills the comfortable explanation. |
 | 3 | `04_category_margin` + `05_cost_structure` | Electronics is 50.6% of revenue at −4.9%, and the reason is a 94% merchandise-cost ratio, not discounting. |
@@ -67,7 +67,7 @@ narrower than "growth is bad", and that distinction is the whole answer.**
 ### The headline indicators are genuinely improving
 
 | Measure | 2023 | 2025 |
-|---|---|---|
+| --- | --- | --- |
 | Net revenue | ₹29.3M | ₹58.0M (+98%) |
 | Orders (revenue-recognising) | 3,542 | 6,169 |
 | Distinct customers | n/a | 6,778 across the period |
@@ -82,7 +82,7 @@ basket size and customer count all moved the right way.
 July 2024. Comparing the 18 months either side (`02_accelerate_split`):
 
 | Per month | Before | After | Change |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Net revenue | ₹2.62M | ₹4.64M | **+77%** |
 | Contribution | ₹0.30M | ₹0.34M | **+14%** |
 | Margin | 11.5% | 7.4% | −4.1 pts |
@@ -157,7 +157,7 @@ thin, wild group outrank a dimension that splits half the business.
 (`07_driver_ranking`)
 
 | Dimension | Weighted spread (pts) | Margin range | Profit gap (₹M) |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **Subcategory** | **15.1** | −9.1% → 31.1% | 9.3 |
 | **Category** | **14.2** | −4.9% → 27.7% | 9.1 |
 | **Price band** | **13.2** | −6.9% → 24.1% | 8.1 |
@@ -212,7 +212,7 @@ in profitability. That is the most useful thing this analysis can tell the room.
 (`08_misleading_pair`, left panel)
 
 | Segment | Margin | Average order value |
-|---|---|---|
+| --- | --- | --- |
 | **Premium** | **2.9%** | ₹12,957 |
 | Occasional | 9.3% | ₹8,731 |
 | Family | 11.2% | ₹8,551 |
@@ -239,7 +239,7 @@ reverses the ordering.
 (`08_misleading_pair`, right panel)
 
 | Segment | Electronics orders | Everything else | Electronics share of revenue |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Premium | −6.9% | **21.9%** | 65.9% |
 | Family | −4.2% | 22.3% | 41.9% |
 | Value Seeker | −3.5% | 24.3% | 44.4% |

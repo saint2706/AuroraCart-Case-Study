@@ -51,7 +51,7 @@ Each missing field was checked against its related columns before deciding
 anything, because "missing" here means three unrelated things:
 
 | Field | Why it is missing | Treatment |
-|---|---|---|
+| --- | --- | --- |
 | `Promotion_Type` | No promotion was applied | Recode to `"No Promotion"`. This is information, not absence |
 | `Membership_Type` | Customer has no paid membership | Recode to `"No Membership"` |
 | `Age_Group` | Not captured in the profile | Recode to `"Unknown"`, an explicit level, so it can be excluded knowingly |
@@ -127,7 +127,7 @@ from being a story fitted to a wiggle.
 ## Metric definitions used throughout
 
 | Metric | Definition | Denominator |
-|---|---|---|
+| --- | --- | --- |
 | Net revenue | `sum(Net_Revenue)` | Non-cancelled orders |
 | Contribution / profit | `sum(Profit)` = net revenue − product − delivery − marketing − operating cost | Non-cancelled orders |
 | Margin | `sum(Profit) ÷ sum(Net_Revenue) × 100` | Non-cancelled orders |

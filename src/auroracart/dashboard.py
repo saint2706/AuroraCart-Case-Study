@@ -1,7 +1,7 @@
 """AuroraCart at a Crossroads — interactive profitability & operations dashboard.
 
-Run locally:      python dashboard.py            (http://127.0.0.1:8050)
-Run for prod:      gunicorn dashboard:server
+Run locally:      python app.py                  (http://127.0.0.1:8050)
+Run for prod:     gunicorn app:server
 
 Layout: a global filter bar (date range, region, category, segment, fulfillment
 mode) drives four tabs — Executive Overview, Profitability Deep-Dive, Customers,
@@ -34,7 +34,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 from dash import Input, Output, dash_table, dcc, html
 
-from data_prep import (
+from auroracart import analysis as A
+from auroracart.data_prep import (
     CATEGORY_ORDER,
     FULFILLMENT_ORDER,
     LOYALTY_ORDER,
@@ -43,14 +44,14 @@ from data_prep import (
     SEGMENT_ORDER,
     load_data,
 )
-from responsive import (
+from auroracart.responsive import (
     CHART_COL,
     ViewProfile,
     graph_config,
     profile_from_store,
     responsive_figure,
 )
-from viz_theme import (
+from auroracart.viz_theme import (
     CATEGORICAL,
     DIVERGING_BLUE_RED,
     INK,
@@ -234,6 +235,42 @@ def _outside_label_range(series: pd.Series, pad: float = 0.22) -> list[float]:
     return [lo - span * pad if lo < 0 else 0, hi + span * pad]
 
 
+def _mark_event(fig, months: pd.Series, when: pd.Timestamp, label: str) -> None:
+    """Annotate a dated intervention on a time series, if it falls inside the view.
+
+    Silently does nothing when the filtered date range excludes the event, so a
+    filtered chart never carries a marker pointing off its own axis.
+    """
+    if months.empty or not (months.min() <= when <= months.max()):
+        return
+    fig.add_vline(x=when, line_dash="dash", line_width=1, line_color=INK["muted"],
+                  annotation_text=label, annotation_position="top left",
+                  annotation_font=dict(color=INK["muted"], size=11))
+
+
+def recommendation_card(rank: int, title: str, evidence: str, benefit: str,
+                        risk: str, ask: str, accent: str) -> dbc.Card:
+    """One prioritised recommendation, in the four parts Question 5 asks for.
+
+    Rank is shown as a numeral rather than implied by position, because the cards
+    reflow into a single column on a phone and reading order is the only cue left.
+    """
+    return dbc.Card(
+        dbc.CardBody([
+            html.Div(f"Priority {rank}", className="stat-label"),
+            html.H3(title, className="rec-title"),
+            html.Dl([
+                html.Dt("Evidence"), html.Dd(evidence),
+                html.Dt("Expected benefit"), html.Dd(benefit),
+                html.Dt("Principal risk"), html.Dd(risk),
+                html.Dt("Before we act, we need"), html.Dd(ask),
+            ], className="rec-list"),
+        ]),
+        className="stat-card rec-card",
+        style={"borderTop": f"3px solid {accent}"},
+    )
+
+
 # --------------------------------------------------------------------------- tab renderers
 
 
@@ -295,6 +332,9 @@ def render_overview(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
     fig_margin.add_hline(y=margin, line_dash="dot", line_width=1, line_color=INK["axis"],
                           annotation_text="period average", annotation_font_color=INK["muted"],
                           annotation_position="top left")
+    # The case names two dated interventions; a margin trend without them invites
+    # the audience to invent their own explanation for the break.
+    _mark_event(fig_margin, monthly["Order_YearMonth"], A.ACCELERATE_START, "Accelerate 2.0")
     trend = "▼" if monthly["Margin_Pct"].iloc[-1] < monthly["Margin_Pct"].iloc[0] else "▲"
     fig_margin.add_annotation(x=last["Order_YearMonth"], y=monthly["Margin_Pct"].iloc[-1],
                                text=f"{trend} {monthly['Margin_Pct'].iloc[-1]:.1f}%", showarrow=False, yshift=16,
@@ -610,15 +650,27 @@ def render_operations(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
                            xaxis=dict(range=[0, ret["Return_Rate"].max() * 1.3]))
     finalize(fig_ret, height=320)
 
-    # --- Delivery delay distribution: single continuous series -> flat orange (friction/cost family).
-    # 30 bins across a phone's ~340px plot leaves sub-pixel bars, so halve the
-    # resolution rather than render a smear.
-    fig_delay = px.histogram(dff.dropna(subset=["Delivery_Delay_Days"]), x="Delivery_Delay_Days",
-                              nbins=15 if view.is_narrow else 30,
-                              title="Delivery Delay Distribution (days)", color_discrete_sequence=[C_COST])
-    fig_delay.update_traces(marker=dict(cornerradius=2), hovertemplate="<b>%{y:,}</b> orders<br>~%{x:.1f} days late<extra></extra>")
-    fig_delay.update_layout(xaxis_title="Delay (days)", yaxis_title="Orders", bargap=0.08, showlegend=False)
-    finalize(fig_delay, height=320)
+    # --- Monthly on-time rate. The bar chart above pools three years and lands near
+    # 43% in every mode, which reads as "delivery is uniformly broken". The monthly
+    # series says something quite different: a step change when the January 2025
+    # contract started, and a collapse every October–November. Both facts are
+    # invisible in the pooled average, so this chart carries the shading and the
+    # event marker that make them unmissable.
+    monthly_ops = A.monthly_operations(dff).reset_index()
+    fig_ontime = px.line(monthly_ops, x="Order_YearMonth", y="On_Time_Pct", markers=True,
+                          title="On-Time Rate by Month — the average hides two stories",
+                          color_discrete_sequence=[C_REVENUE])
+    style_line(fig_ontime)
+    fig_ontime.update_traces(hovertemplate="<b>%{y:.1f}%</b> on time<br>%{x|%b %Y}<extra></extra>")
+    for _, row in monthly_ops[monthly_ops["Is_Peak"]].iterrows():
+        month_start = row["Order_YearMonth"]
+        fig_ontime.add_vrect(x0=month_start, x1=month_start + pd.offsets.MonthEnd(1),
+                              fillcolor=STATUS["critical"], opacity=0.07, line_width=0, layer="below")
+    _mark_event(fig_ontime, monthly_ops["Order_YearMonth"], A.LOGISTICS_START, "New logistics contract")
+    fig_ontime.update_layout(xaxis_title=None, yaxis_title="On-Time Rate (%)",
+                              yaxis=dict(range=[0, 100]), margin=dict(r=45))
+    finalize(fig_ontime, height=320)
+    ontime_legend = status_legend((STATUS["critical"], "Shaded: Oct–Nov festive peak"))
 
     kpi_col = {"xs": 6, "md": 3}
     cards = dbc.Row([
@@ -642,9 +694,169 @@ def render_operations(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
         dbc.Row([dbc.Col([graph(fig_ops, view), ops_legend], **CHART_COL, className="chart-cell"),
                  dbc.Col(graph(fig_complaint, view), **CHART_COL, className="chart-cell")], className="g-3"),
         dbc.Row([dbc.Col(graph(fig_ret, view), **CHART_COL, className="chart-cell"),
-                 dbc.Col(graph(fig_delay, view), **CHART_COL, className="chart-cell")],
+                 dbc.Col([graph(fig_ontime, view), ontime_legend], **CHART_COL, className="chart-cell")],
                 className="g-3 mt-1"),
         ops_tbl,
+    ])
+
+
+def render_decision(dff: pd.DataFrame, view: ViewProfile) -> html.Div:
+    """The page the case asks for last: what management should actually do.
+
+    Every chart here exists to defend one of the three recommendations, and the
+    two exhibits at the bottom are the pooled-versus-split pair — the view that
+    would have sent leadership after the wrong problem, next to the one that
+    corrects it.
+    """
+    if dff.empty:
+        return empty_state()
+
+    # --- Which lens actually splits profitability? Nominal dimensions, magnitude
+    # on one axis -> one flat hue; the ordering IS the finding, so the bars are
+    # sorted and the two the leadership team argued about are called out by name.
+    drivers = A.driver_ranking(dff).sort_values("Weighted_SD_pp")
+    drivers["Label"] = drivers["Weighted_SD_pp"].apply(lambda v: f"{v:.1f}")
+    drivers["Dimension_Label"] = drivers["Dimension"].str.replace("_", " ")
+    fig_drivers = px.bar(drivers, x="Weighted_SD_pp", y="Dimension_Label", orientation="h",
+                          title="What actually splits profitability", color_discrete_sequence=[C_REVENUE],
+                          text="Label", custom_data=["Profit_Gap_Mn", "Levels"])
+    fig_drivers.update_traces(
+        textposition="outside", textfont_color=INK["secondary"],
+        hovertemplate="<b>%{x:.1f} pts</b> revenue-weighted spread<br>%{y}<br>"
+                      "%{customdata[1]} levels · ₹%{customdata[0]:.1f}M profit gap<extra></extra>",
+    )
+    style_bars(fig_drivers, horizontal=True)
+    fig_drivers.update_layout(
+        xaxis_title="Revenue-weighted spread in margin (percentage points)", yaxis_title=None,
+        margin=dict(l=160, r=60), xaxis=dict(range=[0, drivers["Weighted_SD_pp"].max() * 1.25]),
+    )
+    finalize(fig_drivers, height=430)
+
+    # --- How much discount each part of the business can absorb. Two series with
+    # opposite conclusions -> the first two fixed categorical slots, direct-labelled
+    # at the line ends rather than via a legend the eye has to shuttle to.
+    banded = A.discount_band_margin(dff, split="Category")
+    banded["Side"] = banded["Category"].astype(str).where(
+        banded["Category"].astype(str) == "Electronics", "Rest of business"
+    )
+    side = (banded.groupby(["Side", "Discount_Band"], observed=True)[["Revenue", "Profit"]].sum()
+            .assign(Margin_Pct=lambda d: d["Profit"] / d["Revenue"] * 100).reset_index())
+    fig_bands = px.line(side, x="Discount_Band", y="Margin_Pct", color="Side", markers=True,
+                        title="Margin by discount depth — the ceiling is category-specific",
+                        color_discrete_sequence=[CATEGORICAL[0], CATEGORICAL[1]],
+                        category_orders={"Discount_Band": A.DISCOUNT_BAND_LABELS,
+                                         "Side": ["Rest of business", "Electronics"]})
+    style_line(fig_bands)
+    fig_bands.update_traces(hovertemplate="<b>%{y:.1f}%</b> margin<br>%{x} discount<extra></extra>")
+    fig_bands.add_hline(y=0, line_dash="dot", line_width=1, line_color=INK["axis"],
+                        annotation_text="break-even", annotation_font_color=INK["muted"],
+                        annotation_position="bottom left")
+    fig_bands.update_layout(xaxis_title="Discount applied", yaxis_title="Profit Margin (%)",
+                            legend=dict(orientation="h", y=-0.28, x=0, title=None))
+    finalize(fig_bands, height=430)
+
+    # --- The Question 4 pair. Same segments, same orders, two encodings: pooled
+    # (a segment problem) and split by Electronics (a product-mix problem).
+    confound = A.segment_margin_confound(dff).reindex(SEGMENT_ORDER).dropna(how="all").reset_index()
+    confound["Label"] = confound["Margin_Pooled"].apply(lambda v: f"{v:.1f}%")
+    fig_pooled = px.bar(confound, x="Customer_Segment", y="Margin_Pooled",
+                        title="Exhibit A — margin by segment (pooled)",
+                        color_discrete_sequence=[C_PROFIT], text="Label")
+    fig_pooled.update_traces(textposition="outside", textfont_color=INK["secondary"],
+                             hovertemplate=pct_hover("Segment"))
+    style_bars(fig_pooled)
+    fig_pooled.update_layout(xaxis_title=None, yaxis_title="Margin (%)", showlegend=False,
+                             yaxis=dict(range=[0, confound["Margin_Pooled"].max() * 1.3]))
+    finalize(fig_pooled, height=360)
+
+    split = confound.melt(
+        id_vars="Customer_Segment",
+        value_vars=["Margin_In_Electronics", "Margin_Ex_Electronics"],
+        var_name="Basket", value_name="Margin_Pct",
+    )
+    split["Basket"] = split["Basket"].map({"Margin_In_Electronics": "Electronics orders",
+                                            "Margin_Ex_Electronics": "Everything else"})
+    fig_split = px.bar(split, x="Customer_Segment", y="Margin_Pct", color="Basket", barmode="group",
+                       title="Exhibit B — the same segments, split by what they bought",
+                       color_discrete_sequence=[CATEGORICAL[1], CATEGORICAL[0]],
+                       category_orders={"Basket": ["Everything else", "Electronics orders"]})
+    fig_split.update_traces(hovertemplate="<b>%{y:.1f}%</b> margin<br>%{x} · %{fullData.name}<extra></extra>")
+    style_bars(fig_split)
+    fig_split.add_hline(y=0, line_color=INK["axis"], line_width=1)
+    fig_split.update_layout(xaxis_title=None, yaxis_title="Margin (%)",
+                            legend=dict(orientation="h", y=-0.28, x=0, title=None))
+    finalize(fig_split, height=360)
+
+    reading = dbc.Alert(
+        [
+            html.B("How to read the pair: "),
+            "Exhibit A is accurate and would send us after the Premium segment. Exhibit B "
+            "shows Premium's margin is ordinary once you separate Electronics from everything "
+            "else — it simply buys Electronics more than any other segment does. The problem "
+            "is the product, not the customer, and only the split view says so.",
+        ],
+        color="light", className="story-callout",
+    )
+
+    cards = dbc.Row([
+        dbc.Col(recommendation_card(
+            1, "Re-cost and re-price Electronics before scaling it",
+            "Electronics is half of revenue at a negative margin, and merchandise cost alone "
+            "eats 94% of what those orders recognise — Smartphones account for most of it.",
+            "Bringing Electronics to break-even recovers the largest single pool of lost "
+            "contribution in the dataset without touching demand elsewhere.",
+            "Electronics drives traffic and basket-building; repricing it may cost volume and "
+            "the attached sales that come with it.",
+            "SKU-level cost and competitor price data — the dataset cannot say whether this is "
+            "a procurement problem or a pricing one.",
+            STATUS["critical"]), md=4),
+        dbc.Col(recommendation_card(
+            2, "Set a category-aware discount ceiling; retire Flash Deals",
+            "Discount depth is uniform across categories but tolerance is not: the rest of the "
+            "business still earns double digits at 25% off, Electronics turns loss-making above 10%. "
+            "Flash Deals are the only promotion with a negative margin.",
+            "Recovers margin on promoted orders with a rule that can be enforced in the "
+            "pricing system next quarter, not a strategic bet.",
+            "Promotion is partly defensive; withdrawing Flash Deals may shift volume to "
+            "competitors or simply move it to other discounts.",
+            "Promotion-level incrementality — the dataset shows what promoted orders earned, "
+            "not what would have happened without the promotion.",
+            STATUS["serious"]), md=4),
+        dbc.Col(recommendation_card(
+            3, "Underwrite acquisition on contribution, not revenue",
+            "Under Accelerate 2.0 revenue per month rose far faster than profit per month, "
+            "and the paid channels' margins fell furthest while spending the largest share of "
+            "the revenue they generate.",
+            "Reallocating spend toward the channels that held their margin protects growth "
+            "while stopping the purchase of revenue at near-zero contribution.",
+            "Paid channels may be seeding customers whose value shows up later; order-level "
+            "data cannot see a lifetime.",
+            "Cohort retention and repeat-purchase value by acquisition channel.",
+            STATUS["warning"]), md=4),
+    ], className="g-3 mb-3")
+
+    stakes = A.group_economics(dff, "Category").reset_index()
+    stakes_tbl = table_view(
+        stakes.assign(Revenue=lambda d: d["Revenue"].round(0), Profit=lambda d: d["Profit"].round(0)),
+        ["Category", "Revenue", "Profit", "Margin_Pct", "Avg_Discount", "Revenue_Share_Pct"],
+        "Profit at stake by category (filtered selection)", view,
+    )
+
+    return html.Div([
+        dbc.Alert(
+            [html.B("Three actions, in priority order. "),
+             "Each is sized by the contribution it puts at stake, and each names the one piece "
+             "of information we would want before committing. Recommendations were framed on the "
+             "full Jan 2023 – Dec 2025 period; the charts below follow your filters."],
+            color="light", className="story-callout"),
+        cards,
+        dbc.Row([dbc.Col(graph(fig_drivers, view), **CHART_COL, className="chart-cell"),
+                 dbc.Col(graph(fig_bands, view), **CHART_COL, className="chart-cell")], className="g-3"),
+        reading,
+        dbc.Row([dbc.Col(graph(fig_pooled, view), **CHART_COL, className="chart-cell"),
+                 dbc.Col(graph(fig_split, view), **CHART_COL, className="chart-cell")],
+                className="g-3 mt-1"),
+        stakes_tbl,
     ])
 
 
@@ -653,6 +865,7 @@ RENDERERS = {
     "profitability": render_profitability,
     "customers": render_customers,
     "operations": render_operations,
+    "decision": render_decision,
 }
 
 # --------------------------------------------------------------------------- app
@@ -684,7 +897,7 @@ app = dash.Dash(
         {"name": "format-detection", "content": "telephone=no"},
     ],
 )
-server = app.server  # exposed for gunicorn: `gunicorn dashboard:server`
+server = app.server  # exposed for gunicorn via the root `app.py`: `gunicorn app:server`
 
 # Dash renders its scripts at the end of <body>, which would leave the first
 # paint un-stamped. This inline snippet applies a provisional viewport class in
@@ -811,6 +1024,7 @@ app.layout = dbc.Container(
                 dcc.Tab(label="Profitability Deep-Dive", value="profitability"),
                 dcc.Tab(label="Customers", value="customers"),
                 dcc.Tab(label="Operations & Delivery", value="operations"),
+                dcc.Tab(label="Decision", value="decision"),
             ],
         ),
         dcc.Loading(html.Div(id="tab-content", className="tab-content"), type="circle", color=CATEGORICAL[0]),
@@ -924,5 +1138,10 @@ def reset_filters(_):
     return MIN_DATE, MAX_DATE, None, None, None, None
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Run the development server (``python app.py`` / ``auroracart-dashboard``)."""
     app.run(debug=True)
+
+
+if __name__ == "__main__":
+    main()

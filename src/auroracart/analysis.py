@@ -69,23 +69,21 @@ def margin_pct(df: pd.DataFrame) -> float:
     return float(df["Profit"].sum() / revenue * 100) if revenue else float("nan")
 
 
-def group_economics(df: pd.DataFrame, dim: str | list[str], *, sort_by: str = "Revenue",
-                    ascending: bool = False) -> pd.DataFrame:
+def group_economics(
+    df: pd.DataFrame, dim: str | list[str], *, sort_by: str = "Revenue", ascending: bool = False
+) -> pd.DataFrame:
     """Revenue, profit, revenue-weighted margin and discount depth for one cut.
 
     Operates on valid-revenue orders only; ``dim`` may be a single column or a
     list for a crosstab-style cut.
     """
     valid = valid_revenue(df)
-    grouped = (
-        valid.groupby(dim, observed=True)
-        .agg(
-            Orders=("Order_ID", "size"),
-            Revenue=("Net_Revenue", "sum"),
-            Profit=("Profit", "sum"),
-            Avg_Discount=("Discount_Percentage", "mean"),
-            AOV=("Net_Revenue", "mean"),
-        )
+    grouped = valid.groupby(dim, observed=True).agg(
+        Orders=("Order_ID", "size"),
+        Revenue=("Net_Revenue", "sum"),
+        Profit=("Profit", "sum"),
+        Avg_Discount=("Discount_Percentage", "mean"),
+        AOV=("Net_Revenue", "mean"),
     )
     grouped = grouped[grouped["Revenue"] > 0]
     grouped["Margin_Pct"] = grouped["Profit"] / grouped["Revenue"] * 100
@@ -138,9 +136,12 @@ class MixDecomposition:
         return abs(self.rate_effect) / (abs(self.mix_effect) + abs(self.rate_effect)) * 100
 
 
-def decompose_margin_change(df: pd.DataFrame, dim: str = "Category",
-                            base_year: int | None = None,
-                            final_year: int | None = None) -> MixDecomposition:
+def decompose_margin_change(
+    df: pd.DataFrame,
+    dim: str = "Category",
+    base_year: int | None = None,
+    final_year: int | None = None,
+) -> MixDecomposition:
     """Split a margin change into product-mix shift vs within-group erosion.
 
     This is the analytical core of Question 2. "We grew into a worse mix" and
@@ -170,11 +171,20 @@ def decompose_margin_change(df: pd.DataFrame, dim: str = "Category",
     rate_effect = float((weight_base * (rate_final - rate_base)).sum())
     interaction = (final_margin - base_margin) - mix_effect - rate_effect
 
-    return MixDecomposition(base_year, final_year, base_margin, final_margin,
-                            mix_effect, rate_effect, float(interaction))
+    return MixDecomposition(
+        base_year,
+        final_year,
+        base_margin,
+        final_margin,
+        mix_effect,
+        rate_effect,
+        float(interaction),
+    )
 
 
-def era_comparison(df: pd.DataFrame, boundary: pd.Timestamp, labels: tuple[str, str]) -> pd.DataFrame:
+def era_comparison(
+    df: pd.DataFrame, boundary: pd.Timestamp, labels: tuple[str, str]
+) -> pd.DataFrame:
     """Before/after a dated intervention, on the measures that intervention touches.
 
     Rates that describe operations (on-time, complaints, cancellations) use every
@@ -183,33 +193,41 @@ def era_comparison(df: pd.DataFrame, boundary: pd.Timestamp, labels: tuple[str, 
     always looks bigger.
     """
     before, after = labels
-    era = pd.Series(np.where(df["Order_Date"] < boundary, before, after), index=df.index, name="Era")
+    era = pd.Series(
+        np.where(df["Order_Date"] < boundary, before, after), index=df.index, name="Era"
+    )
     ops = df.groupby(era, observed=True)
     valid = valid_revenue(df)
     valid_era = era.loc[valid.index]
     rev = valid.groupby(valid_era, observed=True)
 
     months = valid.groupby(valid_era, observed=True)["Order_YearMonth"].nunique()
-    out = pd.DataFrame({
-        "Orders": ops.size(),
-        "Months_Observed": months,
-        "Revenue": rev["Net_Revenue"].sum(),
-        "Profit": rev["Profit"].sum(),
-        "Revenue_Per_Month": rev["Net_Revenue"].sum() / months,
-        "Profit_Per_Month": rev["Profit"].sum() / months,
-        "Orders_Per_Month": rev.size() / months,
-        "Margin_Pct": rev["Profit"].sum() / rev["Net_Revenue"].sum() * 100,
-        "Avg_Discount_Pct": rev["Discount_Percentage"].mean(),
-        "AOV": rev["Net_Revenue"].mean(),
-        "Marketing_Pct_of_Revenue": rev["Marketing_Cost"].sum() / rev["Net_Revenue"].sum() * 100,
-        "Delivery_Cost_Per_Order": ops["Delivery_Cost"].mean(),
-        "On_Time_Pct": ops["On_Time_Flag"].mean() * 100,
-        "Delivery_Delay_Days": ops["Delivery_Delay_Days"].mean(),
-        "Avg_Rating": ops["Customer_Rating"].mean(),
-        "Complaint_Pct": ops["Complaint_Flag"].mean() * 100,
-        "Return_Pct": ops["Return_Flag"].mean() * 100,
-        "New_Customer_Share_Pct": ops["New_vs_Returning"].apply(lambda s: (s == "New").mean() * 100),
-    })
+    out = pd.DataFrame(
+        {
+            "Orders": ops.size(),
+            "Months_Observed": months,
+            "Revenue": rev["Net_Revenue"].sum(),
+            "Profit": rev["Profit"].sum(),
+            "Revenue_Per_Month": rev["Net_Revenue"].sum() / months,
+            "Profit_Per_Month": rev["Profit"].sum() / months,
+            "Orders_Per_Month": rev.size() / months,
+            "Margin_Pct": rev["Profit"].sum() / rev["Net_Revenue"].sum() * 100,
+            "Avg_Discount_Pct": rev["Discount_Percentage"].mean(),
+            "AOV": rev["Net_Revenue"].mean(),
+            "Marketing_Pct_of_Revenue": rev["Marketing_Cost"].sum()
+            / rev["Net_Revenue"].sum()
+            * 100,
+            "Delivery_Cost_Per_Order": ops["Delivery_Cost"].mean(),
+            "On_Time_Pct": ops["On_Time_Flag"].mean() * 100,
+            "Delivery_Delay_Days": ops["Delivery_Delay_Days"].mean(),
+            "Avg_Rating": ops["Customer_Rating"].mean(),
+            "Complaint_Pct": ops["Complaint_Flag"].mean() * 100,
+            "Return_Pct": ops["Return_Flag"].mean() * 100,
+            "New_Customer_Share_Pct": ops["New_vs_Returning"].apply(
+                lambda s: (s == "New").mean() * 100
+            ),
+        }
+    )
     return out.reindex([before, after])
 
 
@@ -226,7 +244,9 @@ def logistics_comparison(df: pd.DataFrame) -> pd.DataFrame:
 # --------------------------------------------------------------------------- Q3: hidden drivers
 
 
-def driver_ranking(df: pd.DataFrame, dimensions: tuple[str, ...] = DRIVER_DIMENSIONS) -> pd.DataFrame:
+def driver_ranking(
+    df: pd.DataFrame, dimensions: tuple[str, ...] = DRIVER_DIMENSIONS
+) -> pd.DataFrame:
     """Rank candidate explanations of profitability by how much they actually split it.
 
     "Performance" here is contribution margin (revenue-weighted). For each
@@ -263,15 +283,19 @@ def driver_ranking(df: pd.DataFrame, dimensions: tuple[str, ...] = DRIVER_DIMENS
         # Shortfall only — groups already above the company margin contribute 0,
         # so this is "profit forgone", not a net of winners against losers.
         shortfall_pp = (company_margin - group_margin).clip(lower=0)
-        rows.append({
-            "Dimension": dim,
-            "Levels": len(grouped),
-            "Worst_Margin_pp": group_margin.min(),
-            "Best_Margin_pp": group_margin.max(),
-            "Margin_Range_pp": group_margin.max() - group_margin.min(),
-            "Weighted_SD_pp": float(np.sqrt((weight * (group_margin - company_margin) ** 2).sum())),
-            "Profit_Gap_Mn": float((shortfall_pp / 100 * grouped["Revenue"]).sum() / 1e6),
-        })
+        rows.append(
+            {
+                "Dimension": dim,
+                "Levels": len(grouped),
+                "Worst_Margin_pp": group_margin.min(),
+                "Best_Margin_pp": group_margin.max(),
+                "Margin_Range_pp": group_margin.max() - group_margin.min(),
+                "Weighted_SD_pp": float(
+                    np.sqrt((weight * (group_margin - company_margin) ** 2).sum())
+                ),
+                "Profit_Gap_Mn": float((shortfall_pp / 100 * grouped["Revenue"]).sum() / 1e6),
+            }
+        )
 
     ranking = pd.DataFrame(rows).sort_values("Weighted_SD_pp", ascending=False)
     return ranking.reset_index(drop=True)
@@ -335,22 +359,28 @@ def breakeven_discount(df: pd.DataFrame, dim: str = "Category") -> pd.DataFrame:
     rows = []
     for name, group in banded.groupby(dim, observed=True):
         profitable = group[group["Margin_Pct"] > 0]
-        rows.append({
-            dim: name,
-            "Last_Profitable_Band": profitable["Discount_Band"].iloc[-1] if len(profitable) else "none",
-            "First_Loss_Band": (
-                group[group["Margin_Pct"] <= 0]["Discount_Band"].iloc[0]
-                if (group["Margin_Pct"] <= 0).any() else "none observed"
-            ),
-        })
+        rows.append(
+            {
+                dim: name,
+                "Last_Profitable_Band": profitable["Discount_Band"].iloc[-1]
+                if len(profitable)
+                else "none",
+                "First_Loss_Band": (
+                    group[group["Margin_Pct"] <= 0]["Discount_Band"].iloc[0]
+                    if (group["Margin_Pct"] <= 0).any()
+                    else "none observed"
+                ),
+            }
+        )
     return pd.DataFrame(rows)
 
 
-# --------------------------------------------------------------------------- Q4: the misleading pair
+# ------------------------------------------------------------------ Q4: the misleading pair
 
 
-def segment_margin_confound(df: pd.DataFrame, confounder: str = "Category",
-                            confound_level: str = "Electronics") -> pd.DataFrame:
+def segment_margin_confound(
+    df: pd.DataFrame, confounder: str = "Category", confound_level: str = "Electronics"
+) -> pd.DataFrame:
     """The Premium-segment paradox, and its resolution.
 
     Pooled across categories, Premium looks like the company's worst segment.
@@ -368,16 +398,24 @@ def segment_margin_confound(df: pd.DataFrame, confounder: str = "Category",
         )
         return (grouped["Profit"] / grouped["Revenue"] * 100).rename(label)
 
-    mix = valid.pivot_table(index="Customer_Segment", columns=confounder,
-                            values="Net_Revenue", aggfunc="sum", observed=True)
+    mix = valid.pivot_table(
+        index="Customer_Segment",
+        columns=confounder,
+        values="Net_Revenue",
+        aggfunc="sum",
+        observed=True,
+    )
     share = (mix[confound_level] / mix.sum(axis=1) * 100).rename(f"{confound_level}_Share_Pct")
 
-    return pd.concat([
-        by_segment(valid, "Margin_Pooled"),
-        by_segment(inside, f"Margin_In_{confound_level}"),
-        by_segment(outside, f"Margin_Ex_{confound_level}"),
-        share,
-    ], axis=1)
+    return pd.concat(
+        [
+            by_segment(valid, "Margin_Pooled"),
+            by_segment(inside, f"Margin_In_{confound_level}"),
+            by_segment(outside, f"Margin_Ex_{confound_level}"),
+            share,
+        ],
+        axis=1,
+    )
 
 
 # --------------------------------------------------------------------------- operations
@@ -408,8 +446,9 @@ def monthly_operations(df: pd.DataFrame) -> pd.DataFrame:
 def peak_season_gap(df: pd.DataFrame) -> pd.DataFrame:
     """On-time attainment in the Oct–Nov peak versus the rest of the year, by year."""
     monthly = monthly_operations(df)
-    frame = monthly.assign(Year=monthly.index.year,
-                           Window=np.where(monthly["Is_Peak"], "Oct–Nov peak", "Rest of year"))
+    frame = monthly.assign(
+        Year=monthly.index.year, Window=np.where(monthly["Is_Peak"], "Oct–Nov peak", "Rest of year")
+    )
     weighted = frame.groupby(["Year", "Window"], observed=True).apply(
         lambda g: np.average(g["On_Time_Pct"], weights=g["Orders"]), include_groups=False
     )
@@ -436,17 +475,21 @@ def channel_economics_by_era(df: pd.DataFrame) -> pd.DataFrame:
     valid = valid_revenue(df).copy()
     valid["Era"] = np.where(valid["Order_Date"] < ACCELERATE_START, "Before", "After")
     grouped = valid.groupby(["Acquisition_Channel", "Era"], observed=True).agg(
-        Revenue=("Net_Revenue", "sum"), Profit=("Profit", "sum"), Marketing_Cost=("Marketing_Cost", "sum")
+        Revenue=("Net_Revenue", "sum"),
+        Profit=("Profit", "sum"),
+        Marketing_Cost=("Marketing_Cost", "sum"),
     )
     margin = (grouped["Profit"] / grouped["Revenue"] * 100).unstack()
     spend = (grouped["Marketing_Cost"] / grouped["Revenue"] * 100).unstack()
-    out = pd.DataFrame({
-        "Margin_Before": margin["Before"],
-        "Margin_After": margin["After"],
-        "Margin_Change_pp": margin["After"] - margin["Before"],
-        "Marketing_Pct_Before": spend["Before"],
-        "Marketing_Pct_After": spend["After"],
-    })
+    out = pd.DataFrame(
+        {
+            "Margin_Before": margin["Before"],
+            "Margin_After": margin["After"],
+            "Margin_Change_pp": margin["After"] - margin["Before"],
+            "Marketing_Pct_Before": spend["Before"],
+            "Marketing_Pct_After": spend["After"],
+        }
+    )
     return out.sort_values("Margin_After")
 
 
@@ -490,15 +533,19 @@ def headline_facts(df: pd.DataFrame) -> dict[str, float]:
         ),
         "margin_first_year": float(years.loc[first_year, "Margin_Pct"]),
         "margin_last_year": float(years.loc[last_year, "Margin_Pct"]),
-        "margin_drop_pp": float(years.loc[first_year, "Margin_Pct"] - years.loc[last_year, "Margin_Pct"]),
+        "margin_drop_pp": float(
+            years.loc[first_year, "Margin_Pct"] - years.loc[last_year, "Margin_Pct"]
+        ),
         "mix_effect_pp": decomposition.mix_effect,
         "rate_effect_pp": decomposition.rate_effect,
         "rate_share_pct": decomposition.rate_share_pct,
         "accelerate_revenue_per_month_growth_pct": float(
-            accelerate["Revenue_Per_Month"].iloc[1] / accelerate["Revenue_Per_Month"].iloc[0] * 100 - 100
+            accelerate["Revenue_Per_Month"].iloc[1] / accelerate["Revenue_Per_Month"].iloc[0] * 100
+            - 100
         ),
         "accelerate_profit_per_month_growth_pct": float(
-            accelerate["Profit_Per_Month"].iloc[1] / accelerate["Profit_Per_Month"].iloc[0] * 100 - 100
+            accelerate["Profit_Per_Month"].iloc[1] / accelerate["Profit_Per_Month"].iloc[0] * 100
+            - 100
         ),
         "accelerate_margin_before": float(accelerate["Margin_Pct"].iloc[0]),
         "accelerate_margin_after": float(accelerate["Margin_Pct"].iloc[1]),
@@ -509,7 +556,9 @@ def headline_facts(df: pd.DataFrame) -> dict[str, float]:
         "electronics_revenue_share": float(electronics["Revenue_Share_Pct"]),
         "electronics_margin": float(electronics["Margin_Pct"]),
         "electronics_profit": float(electronics["Profit"]),
-        "electronics_product_cost_pct": float(cost_structure(df).loc["Electronics", "Product_Cost_Pct"]),
+        "electronics_product_cost_pct": float(
+            cost_structure(df).loc["Electronics", "Product_Cost_Pct"]
+        ),
         "smartphones_revenue_share": float(smartphones["Revenue_Share_Pct"]),
         "smartphones_margin": float(smartphones["Margin_Pct"]),
         "smartphones_profit": float(smartphones["Profit"]),

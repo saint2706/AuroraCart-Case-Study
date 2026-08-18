@@ -44,7 +44,8 @@ def test_every_deck_figure_exists(facts):
     from tools.build_deck import build_slides
 
     missing = [
-        s.figure for s in build_slides(facts)
+        s.figure
+        for s in build_slides(facts)
         if s.figure and not (FIGURES_DIR / f"{s.figure}.png").exists()
     ]
     assert not missing, f"run tools/build_figures.py — missing {missing}"

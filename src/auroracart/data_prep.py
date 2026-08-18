@@ -66,8 +66,14 @@ def load_data(raw_path: Path | str = RAW_PATH) -> pd.DataFrame:
     df["Membership_Type"] = df["Membership_Type"].fillna("No Membership")
     df["Age_Group"] = df["Age_Group"].fillna("Unknown")
 
-    for col in ["Weekend_Flag", "Coupon_Used", "On_Time_Flag", "Return_Flag",
-                "Cancellation_Flag", "Complaint_Flag"]:
+    for col in [
+        "Weekend_Flag",
+        "Coupon_Used",
+        "On_Time_Flag",
+        "Return_Flag",
+        "Cancellation_Flag",
+        "Complaint_Flag",
+    ]:
         df[col] = df[col].map({"Yes": True, "No": False}).astype(bool)
 
     # A cancelled order carries Net_Revenue = 0 by construction (confirmed 1:1 in the

@@ -33,7 +33,9 @@ def test_assets_travel_with_the_package():
 
 
 @pytest.mark.parametrize("tab", sorted(D.RENDERERS))
-@pytest.mark.parametrize("view", [DEFAULT_PROFILE, profile_from_store({"width": 375, "pointer": "coarse"})])
+@pytest.mark.parametrize(
+    "view", [DEFAULT_PROFILE, profile_from_store({"width": 375, "pointer": "coarse"})]
+)
 def test_every_tab_renders(data, tab: str, view: ViewProfile):
     assert D.RENDERERS[tab](data, view) is not None
 
@@ -45,8 +47,13 @@ def test_every_tab_survives_an_empty_selection(data, tab: str):
 
 def test_filters_narrow_the_frame(data):
     filtered = D.apply_filters(
-        data, data["Order_Date"].min(), data["Order_Date"].max(),
-        regions=["North"], categories=["Electronics"], segments=None, fulfillment=None,
+        data,
+        data["Order_Date"].min(),
+        data["Order_Date"].max(),
+        regions=["North"],
+        categories=["Electronics"],
+        segments=None,
+        fulfillment=None,
     )
     assert 0 < len(filtered) < len(data)
     assert set(filtered["Region"].unique()) == {"North"}

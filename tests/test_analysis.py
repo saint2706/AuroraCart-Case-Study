@@ -52,7 +52,10 @@ def test_product_mix_outranks_geography(df):
     ranking = A.driver_ranking(df).set_index("Dimension")
     assert ranking.index[0] in {"Subcategory", "Category", "Price_Band"}
     assert ranking.loc["Category", "Weighted_SD_pp"] > ranking.loc["Region", "Weighted_SD_pp"] * 10
-    assert ranking.loc["Category", "Weighted_SD_pp"] > ranking.loc["Fulfillment_Mode", "Weighted_SD_pp"] * 10
+    assert (
+        ranking.loc["Category", "Weighted_SD_pp"]
+        > ranking.loc["Fulfillment_Mode", "Weighted_SD_pp"] * 10
+    )
 
 
 def test_premium_paradox_is_a_category_mix_artifact(facts):

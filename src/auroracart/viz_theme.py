@@ -13,7 +13,16 @@ import plotly.io as pio
 
 # Fixed-order categorical palette (colorblind-validated, dark-surface steps).
 # Assign by entity identity, never by rank, and never cycle past what's needed.
-CATEGORICAL = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"]
+CATEGORICAL = [
+    "#3987e5",
+    "#d95926",
+    "#199e70",
+    "#c98500",
+    "#d55181",
+    "#008300",
+    "#9085e9",
+    "#e66767",
+]
 
 # On a dark surface the ramp runs dark -> light so that "more" reads as brighter;
 # the near-surface end still means "near zero" and is allowed to recede.
@@ -26,7 +35,11 @@ SEQUENTIAL_BLUE = ["#104281", "#184f95", "#1c5cab", "#256abf", "#3987e5", "#5598
 # Dark-surface arms: the midpoint recedes to a near-surface gray and intensity (lightness)
 # rises toward each pole, the reverse of the light theme's darkening arms.
 DIVERGING_BLUE_RED = [
-    [0.0, "#eb8483"], [0.25, "#a94443"], [0.5, "#383835"], [0.75, "#2a78d6"], [1.0, "#9ec5f4"],
+    [0.0, "#eb8483"],
+    [0.25, "#a94443"],
+    [0.5, "#383835"],
+    [0.75, "#2a78d6"],
+    [1.0, "#9ec5f4"],
 ]
 
 # 4-step ordinal ramp (New -> Champion): monotone lightness, and the end nearest the surface
@@ -38,8 +51,14 @@ ORDINAL_BLUE_4 = ["#184f95", "#256abf", "#3987e5", "#5598e7"]
 # Status steps are mode-invariant by design: all four clear 3:1 on the dark surface.
 STATUS = {"good": "#0ca30c", "warning": "#fab219", "serious": "#ec835a", "critical": "#d03b3b"}
 
-INK = {"primary": "#ffffff", "secondary": "#c3c2b7", "muted": "#898781", "grid": "#2c2c2a", "axis": "#383835"}
-SURFACE = "#1a1a19"          # chart surface — slide backgrounds match it so figures blend in
+INK = {
+    "primary": "#ffffff",
+    "secondary": "#c3c2b7",
+    "muted": "#898781",
+    "grid": "#2c2c2a",
+    "axis": "#383835",
+}
+SURFACE = "#1a1a19"  # chart surface — slide backgrounds match it so figures blend in
 SURFACE_ELEVATED = "#242422"  # hover cards and anything that floats above the surface
 
 # The one place the brand shows its name: an aurora sweep from the palette's own
@@ -63,17 +82,26 @@ _template.layout = go.Layout(
     paper_bgcolor=SURFACE,
     plot_bgcolor=SURFACE,
     xaxis=dict(
-        gridcolor=INK["grid"], zerolinecolor=INK["axis"], linecolor=INK["axis"],
-        tickfont=dict(color=INK["muted"]), title_font=dict(color=INK["secondary"]),
+        gridcolor=INK["grid"],
+        zerolinecolor=INK["axis"],
+        linecolor=INK["axis"],
+        tickfont=dict(color=INK["muted"]),
+        title_font=dict(color=INK["secondary"]),
     ),
     yaxis=dict(
-        gridcolor=INK["grid"], zerolinecolor=INK["axis"], linecolor=INK["axis"],
-        tickfont=dict(color=INK["muted"]), title_font=dict(color=INK["secondary"]),
+        gridcolor=INK["grid"],
+        zerolinecolor=INK["axis"],
+        linecolor=INK["axis"],
+        tickfont=dict(color=INK["muted"]),
+        title_font=dict(color=INK["secondary"]),
     ),
     legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=INK["secondary"])),
     margin=dict(l=60, r=30, t=60, b=50),
-    hoverlabel=dict(bgcolor=SURFACE_ELEVATED, bordercolor=INK["axis"],
-                    font=dict(family=FONT_FAMILY, color=INK["primary"])),
+    hoverlabel=dict(
+        bgcolor=SURFACE_ELEVATED,
+        bordercolor=INK["axis"],
+        font=dict(family=FONT_FAMILY, color=INK["primary"]),
+    ),
 )
 pio.templates["auroracart"] = _template
 pio.templates.default = "auroracart"

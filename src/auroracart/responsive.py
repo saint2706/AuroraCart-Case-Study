@@ -68,12 +68,12 @@ class ViewProfile:
     hover: bool = True
     dpr: float = 1.0
     reduced_motion: bool = False
-    platform: str = "unknown"   # ios | android | mac | windows | linux | unknown
-    browser: str = "unknown"    # chrome | safari | firefox | edge | opera | samsung
-    engine: str = "unknown"     # blink | webkit | gecko
+    platform: str = "unknown"  # ios | android | mac | windows | linux | unknown
+    browser: str = "unknown"  # chrome | safari | firefox | edge | opera | samsung
+    engine: str = "unknown"  # blink | webkit | gecko
     standalone: bool = False
     supports: dict[str, bool] = field(default_factory=dict)
-    known: bool = False         # True once the browser has actually reported in
+    known: bool = False  # True once the browser has actually reported in
 
     # ---------------------------------------------------------------- shape
 
@@ -177,18 +177,28 @@ def profile_from_store(data: Any) -> ViewProfile:
         tier=tier,
         width=width,
         height=height,
-        orientation=_as_choice(data.get("orientation"), ("portrait", "landscape"),
-                               "portrait" if height >= width else "landscape"),
+        orientation=_as_choice(
+            data.get("orientation"),
+            ("portrait", "landscape"),
+            "portrait" if height >= width else "landscape",
+        ),
         touch=_as_bool(data.get("touch")),
         coarse=_as_bool(data.get("coarse")),
         hover=_as_bool(data.get("hover"), default=True),
-        dpr=max(0.5, min(6.0, float(data.get("dpr") or 1.0))) if _is_number(data.get("dpr")) else 1.0,
+        dpr=max(0.5, min(6.0, float(data.get("dpr") or 1.0)))
+        if _is_number(data.get("dpr"))
+        else 1.0,
         reduced_motion=_as_bool(data.get("reduced_motion")),
-        platform=_as_choice(data.get("platform"),
-                            ("ios", "android", "mac", "windows", "linux", "unknown"), "unknown"),
-        browser=_as_choice(data.get("browser"),
-                           ("chrome", "safari", "firefox", "edge", "opera", "samsung", "unknown"),
-                           "unknown"),
+        platform=_as_choice(
+            data.get("platform"),
+            ("ios", "android", "mac", "windows", "linux", "unknown"),
+            "unknown",
+        ),
+        browser=_as_choice(
+            data.get("browser"),
+            ("chrome", "safari", "firefox", "edge", "opera", "samsung", "unknown"),
+            "unknown",
+        ),
         engine=_as_choice(data.get("engine"), ("blink", "webkit", "gecko", "unknown"), "unknown"),
         standalone=_as_bool(data.get("standalone")),
         supports=supports,
@@ -208,8 +218,8 @@ def _is_number(value: Any) -> bool:
 # grow it back only as far as the (truncated) tick labels actually need.
 _NARROW_MARGIN = dict(l=6, r=26, t=54, b=38)
 _NARROW_TITLE_WRAP = 30
-_NARROW_TICK_CHARS = 14      # horizontal bars: truncate the category axis
-_NARROW_TICK_WRAP = 10       # vertical bars: wrap the category axis onto 2 lines
+_NARROW_TICK_CHARS = 14  # horizontal bars: truncate the category axis
+_NARROW_TICK_WRAP = 10  # vertical bars: wrap the category axis onto 2 lines
 
 
 def _wrap_title(text: str, width: int) -> str:
@@ -236,14 +246,18 @@ def _title_text(fig: go.Figure) -> str | None:
     return title if isinstance(title, str) and title else None
 
 
-def responsive_figure(fig: go.Figure, view: ViewProfile, base_height: int | None = None) -> go.Figure:
+def responsive_figure(
+    fig: go.Figure, view: ViewProfile, base_height: int | None = None
+) -> go.Figure:
     """Re-fit a finished figure to the reported viewport. Mutates and returns it.
 
     Called once per chart, immediately before it is handed to ``dcc.Graph`` —
     every chart keeps its desktop definition in one place and this is the only
     thing that knows about small screens.
     """
-    height = view.chart_height(base_height if base_height is not None else (fig.layout.height or 340))
+    height = view.chart_height(
+        base_height if base_height is not None else (fig.layout.height or 340)
+    )
 
     # Touch devices: a drag inside the plot must scroll the page, not pan the
     # axes. Without this a chart becomes a scroll trap the user has to swipe
@@ -279,8 +293,9 @@ def responsive_figure(fig: go.Figure, view: ViewProfile, base_height: int | None
         xaxis=dict(tickfont=dict(size=10), title_font=dict(size=11)),
         yaxis=dict(tickfont=dict(size=10), title_font=dict(size=11)),
         # A horizontal legend above the plot wraps instead of stealing plot width.
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
-                    font=dict(size=10)),
+        legend=dict(
+            orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, font=dict(size=10)
+        ),
     )
 
     # Value-at-tip labels stay (they are the accessible read of the bar) but
@@ -328,7 +343,7 @@ def _wrap_tick(label: str, width: int, max_lines: int = 2) -> str:
     lines = _wrap_title(label, width).split("<br>")
     if len(lines) <= max_lines:
         return "<br>".join(lines)
-    head, tail = lines[: max_lines - 1], " ".join(lines[max_lines - 1:])
+    head, tail = lines[: max_lines - 1], " ".join(lines[max_lines - 1 :])
     return "<br>".join(head + [_truncate(tail, width + 4)])
 
 

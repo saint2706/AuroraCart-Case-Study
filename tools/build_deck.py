@@ -2,15 +2,21 @@
 
     python tools/build_figures.py && python tools/build_deck.py
 
-Produces ``deliverables/AuroraCart_Executive_Story.pptx`` — a 7–10 minute
-presentation following the case's narrative arc: Context → Tension →
-Investigation → Evidence → Consequence → Decision.
+Produces ``deliverables/AuroraCart_Executive_Story.pptx``, a 7-10 minute
+presentation following the case's narrative arc: Context, Tension,
+Investigation, Evidence, Consequence, Decision.
 
 Every number in the deck comes from :func:`auroracart.analysis.headline_facts`,
 so the slides cannot drift from the dataset. Speaker notes carry the spoken
 version of each slide plus its timing, and the chart images are the ones
-``build_figures.py`` renders — same palette, same mark specs, same numbers as
+``build_figures.py`` renders: same palette, same mark specs, same numbers as
 the dashboard.
+
+The deck is dark, on the same surfaces the dashboard uses. Content slides sit
+on the exact chart-surface color (#1a1a19) so the PNG figures blend into the
+slide with no visible rectangle around them. The one recurring ornament is the
+aurora rule, a short blue-to-violet gradient bar drawn from the two palette
+slots the brand mark uses.
 """
 
 from __future__ import annotations
@@ -28,17 +34,22 @@ from auroracart.paths import DELIVERABLES_DIR, FIGURES_DIR
 
 DECK_PATH = DELIVERABLES_DIR / "AuroraCart_Executive_Story.pptx"
 
-# 16:9. The deck borrows the dashboard's ink and surface tokens so the printed
-# story and the live app read as one system.
+# 16:9. The deck borrows the dashboard's dark ink and surface tokens so the
+# printed story and the live app read as one system.
 SLIDE_W, SLIDE_H = Inches(13.333), Inches(7.5)
 
-INK_PRIMARY = RGBColor(0x0B, 0x0B, 0x0B)
-INK_SECONDARY = RGBColor(0x52, 0x51, 0x4E)
+INK_PRIMARY = RGBColor(0xFF, 0xFF, 0xFF)
+INK_SECONDARY = RGBColor(0xC3, 0xC2, 0xB7)
 INK_MUTED = RGBColor(0x89, 0x87, 0x81)
-SURFACE = RGBColor(0xFC, 0xFC, 0xFB)
-ACCENT = RGBColor(0x2A, 0x78, 0xD6)
+SURFACE = RGBColor(0x1A, 0x1A, 0x19)        # content slides — matches the chart surface exactly
+SURFACE_DEEP = RGBColor(0x0D, 0x0D, 0x0D)   # title/section slides — one step darker for rhythm
+SURFACE_CARD = RGBColor(0x24, 0x24, 0x22)   # recommendation cards
+CARD_EDGE = RGBColor(0x38, 0x38, 0x35)
+ACCENT = RGBColor(0x39, 0x87, 0xE5)         # palette slot 1 (dark step)
+ACCENT_2 = RGBColor(0x90, 0x85, 0xE9)       # palette slot 7 — the aurora's violet end
 CRITICAL = RGBColor(0xD0, 0x3B, 0x3B)
-WHITE = RGBColor(0xFF, 0xFF, 0xFF)
+SERIOUS = RGBColor(0xEC, 0x83, 0x5A)
+WARNING = RGBColor(0xFA, 0xB2, 0x19)
 
 FONT = "Calibri"
 
@@ -90,13 +101,25 @@ def _background(slide, color=SURFACE):
     fill.fore_color.rgb = color
 
 
-def _accent_rule(slide, top, color=ACCENT, width=Inches(1.4)):
-    """A short rule under the headline — the deck's one repeating ornament."""
+def _aurora_fill(shape):
+    """Fill a shape with the blue-to-violet aurora sweep, falling back to solid accent."""
+    try:
+        shape.fill.gradient()
+        stops = shape.fill.gradient_stops
+        stops[0].color.rgb = ACCENT
+        stops[1].color.rgb = ACCENT_2
+        shape.fill.gradient_angle = 0
+    except (AttributeError, TypeError, ValueError):
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = ACCENT
+    shape.line.fill.background()
+    shape.shadow.inherit = False
+
+
+def _accent_rule(slide, top, width=Inches(1.4)):
+    """A short aurora rule under the headline — the deck's one repeating ornament."""
     bar = slide.shapes.add_shape(1, MARGIN, top, width, Emu(28575))  # 1: rectangle
-    bar.fill.solid()
-    bar.fill.fore_color.rgb = color
-    bar.line.fill.background()
-    bar.shadow.inherit = False
+    _aurora_fill(bar)
 
 
 def _fit_image(slide, image_path, top, max_height):
@@ -121,13 +144,10 @@ def _fit_image(slide, image_path, top, max_height):
 def _add_title_slide(prs, slide: Slide):
     layout = prs.slide_layouts[6]  # blank
     s = prs.slides.add_slide(layout)
-    _background(s)
+    _background(s, SURFACE_DEEP)
 
-    band = s.shapes.add_shape(1, Emu(0), Emu(0), SLIDE_W, Inches(0.28))
-    band.fill.solid()
-    band.fill.fore_color.rgb = ACCENT
-    band.line.fill.background()
-    band.shadow.inherit = False
+    band = s.shapes.add_shape(1, Emu(0), Emu(0), SLIDE_W, Inches(0.14))
+    _aurora_fill(band)
 
     frame = _textbox(s, MARGIN, Inches(2.2), CONTENT_W, Inches(3.0))
     _para(frame, slide.title, size=44, bold=True, first=True, space_after=10)
@@ -140,10 +160,11 @@ def _add_title_slide(prs, slide: Slide):
 
 def _add_section_slide(prs, slide: Slide):
     s = prs.slides.add_slide(prs.slide_layouts[6])
-    _background(s, ACCENT)
-    frame = _textbox(s, MARGIN, Inches(2.6), CONTENT_W, Inches(2.4), anchor=MSO_ANCHOR.MIDDLE)
-    _para(frame, slide.subtitle.upper(), size=14, bold=True, color=WHITE, first=True, space_after=10)
-    _para(frame, slide.title, size=36, bold=True, color=WHITE, space_after=0)
+    _background(s, SURFACE_DEEP)
+    _accent_rule(s, Inches(3.32), width=Inches(0.9))
+    frame = _textbox(s, MARGIN, Inches(2.35), CONTENT_W, Inches(2.4))
+    _para(frame, slide.subtitle.upper(), size=14, bold=True, color=ACCENT, first=True, space_after=10)
+    _para(frame, slide.title, size=36, bold=True, color=INK_PRIMARY, space_after=0)
     s.notes_slide.notes_text_frame.text = slide.notes
     return s
 
@@ -198,14 +219,14 @@ def _add_closing_slide(prs, slide: Slide):
         left = MARGIN + Emu(int(i * (col_w + gap)))
         card = s.shapes.add_shape(1, left, Inches(1.85), col_w, Inches(4.6))
         card.fill.solid()
-        card.fill.fore_color.rgb = WHITE
-        card.line.color.rgb = RGBColor(0xE1, 0xE0, 0xD9)
+        card.fill.fore_color.rgb = SURFACE_CARD
+        card.line.color.rgb = CARD_EDGE
         card.line.width = Pt(0.75)
         card.shadow.inherit = False
 
         accent = s.shapes.add_shape(1, left, Inches(1.85), col_w, Inches(0.05))
         accent.fill.solid()
-        accent.fill.fore_color.rgb = [CRITICAL, RGBColor(0xEC, 0x83, 0x5A), RGBColor(0xFA, 0xB2, 0x19)][i]
+        accent.fill.fore_color.rgb = [CRITICAL, SERIOUS, WARNING][i]
         accent.line.fill.background()
         accent.shadow.inherit = False
 
@@ -245,38 +266,38 @@ def build_slides(f: dict) -> list[Slide]:
                      "investment should go.",
             bullets=[
                 f"Order-level analysis, {f['orders']:,.0f} orders · "
-                f"{f['customers']:,.0f} customers · January 2023 – December 2025",
+                f"{f['customers']:,.0f} customers · January 2023 to December 2025",
                 "Prepared for the CEO and senior leadership team",
             ],
-            notes="[0:00–0:30] Two years ago this company was smaller and more profitable. "
+            notes="[0:00-0:30] Two years ago this company was smaller and more profitable. "
                   "Today it is much larger and materially less profitable. I am going to show "
                   "you where that profit went, why the usual explanations are wrong, and the "
                   "three things I would do about it. Five charts do most of the work.",
         ),
         Slide(
             kind="section", subtitle="Context", title="What the numbers say we are",
-            notes="[0:30–0:45] Start with what everyone in the room already agrees on.",
+            notes="[0:30-0:45] Start with what everyone in the room already agrees on.",
         ),
         Slide(
             title=f"Revenue grew {f['revenue_growth_pct']:.0f}%. Margin fell "
                   f"{f['margin_drop_pp']:.1f} points.",
-            subtitle=f"{rupees(f['revenue_first_year'])} → {rupees(f['revenue_last_year'])} net "
-                     f"revenue · {f['margin_first_year']:.1f}% → {f['margin_last_year']:.1f}% margin",
+            subtitle=f"{rupees(f['revenue_first_year'])} to {rupees(f['revenue_last_year'])} net "
+                     f"revenue · {f['margin_first_year']:.1f}% to {f['margin_last_year']:.1f}% margin",
             figure="01_growth_vs_margin",
             bullets=[
                 f"Total contribution across the three years: {rupees(f['profit_total'])} on "
-                f"{rupees(f['revenue_total'])} of net revenue — an {f['margin_total']:.1f}% margin.",
+                f"{rupees(f['revenue_total'])} of net revenue, an {f['margin_total']:.1f}% margin.",
             ],
-            notes="[0:45–1:45] The Chief Growth Officer is right that the business is bigger. "
-                  "Revenue nearly doubled. But margin went the other way, and not slightly — it "
-                  "fell by more than a third of where it started. Two separate panels, not one "
-                  "dual-axis chart, because the crossing point of two arbitrary scales would be "
-                  "a coincidence, not a finding. The question for the next ten minutes is not "
+            notes="[0:45-1:45] The Chief Growth Officer is right that the business is bigger. "
+                  "Revenue nearly doubled. But margin went the other way, and not slightly: it "
+                  "fell by more than a third of where it started. Two separate panels here, not "
+                  "one dual-axis chart, because the crossing point of two arbitrary scales would "
+                  "be a coincidence, not a finding. The question for the next ten minutes is not "
                   "whether we grew. It is what we bought with the growth.",
         ),
         Slide(
             kind="section", subtitle="Tension", title="Growth was purchased, not earned",
-            notes="[1:45–2:00]",
+            notes="[1:45-2:00]",
         ),
         Slide(
             title="Accelerate 2.0 bought revenue at roughly five times the price of profit",
@@ -285,50 +306,50 @@ def build_slides(f: dict) -> list[Slide]:
                      f"(18 months either side of July 2024)",
             figure="02_accelerate_split",
             bullets=[
-                f"Average discount rose {f['accelerate_discount_before']:.1f}% → "
-                f"{f['accelerate_discount_after']:.1f}%; new-customer share of orders rose "
-                f"{f['accelerate_new_share_before']:.0f}% → {f['accelerate_new_share_after']:.0f}%.",
+                f"Average discount rose from {f['accelerate_discount_before']:.1f}% to "
+                f"{f['accelerate_discount_after']:.1f}%; new customers' share of orders rose "
+                f"from {f['accelerate_new_share_before']:.0f}% to {f['accelerate_new_share_after']:.0f}%.",
             ],
-            notes="[2:00–3:00] This is the growth programme, measured on its own terms. "
+            notes="[2:00-3:00] This is the growth programme, measured on its own terms. "
                   "Per-month figures, because the two windows have to be comparable. Revenue per "
                   "month rose 77%. Profit per month rose 14%. We did acquire customers and we did "
-                  "enter Tier 2 — the programme did what it said. It also discounted four points "
+                  "enter Tier 2, so the programme did what it said. It also discounted four points "
                   "deeper to do it. Nothing here says stop growing. It says we are not currently "
                   "being paid for the growth.",
         ),
         Slide(
             kind="section", subtitle="Investigation", title="So where did the margin go?",
-            notes="[3:00–3:10] The obvious answer is that we grew into a worse mix. It is wrong.",
+            notes="[3:00-3:10] The obvious answer is that we grew into a worse mix. It is wrong.",
         ),
         Slide(
-            title="It is not what we sell that changed — it is what we earn on it",
+            title="What we sell has not changed much. What we earn on it has.",
             subtitle=f"{f['rate_share_pct']:.0f}% of the decline is margin erosion inside "
                      f"categories; the mix shift accounts for {abs(f['mix_effect_pp']):.1f} points",
             figure="03_margin_decomposition",
             bullets=[
-                "This matters because the two explanations imply opposite actions: a mix problem "
-                "is fixed by selling something else, an erosion problem by changing the terms we "
-                "sell on.",
+                "The distinction matters because the two explanations call for opposite actions: "
+                "a mix problem is fixed by selling something else, an erosion problem by changing "
+                "the terms we sell on.",
             ],
-            notes="[3:10–4:15] I want to kill the comfortable explanation first. If the decline "
-                  "were a mix story — we grew the low-margin categories — the fix would be "
+            notes="[3:10-4:15] I want to kill the comfortable explanation first. If the decline "
+                  "were a mix story, meaning we grew the low-margin categories, the fix would be "
                   "merchandising. It isn't. Holding the 2023 category mix fixed, margin still "
                   "lands at 7.6%. Nine tenths of the fall happened inside categories we already "
                   "sold. So: which categories, and why.",
         ),
         Slide(
-            title=f"Half of revenue sits in the one category that loses money",
+            title="Half of revenue sits in the one category that loses money",
             subtitle=f"Electronics is {f['electronics_revenue_share']:.0f}% of net revenue at "
-                     f"{f['electronics_margin']:+.1f}% margin — Smartphones alone are "
+                     f"{f['electronics_margin']:+.1f}% margin. Smartphones alone are "
                      f"{f['smartphones_revenue_share']:.0f}% of revenue at "
-                     f"{f['smartphones_margin']:+.1f}%",
+                     f"{f['smartphones_margin']:+.1f}%.",
             figure="04_category_margin",
             bullets=[
                 f"Electronics loses {rupees(abs(f['electronics_profit']))} of contribution while "
                 f"the other four categories earn between 18.6% and 27.7%.",
             ],
-            notes="[4:15–5:00] Here is the concentration. Electronics is not a rounding error — "
-                  "it is half the company, and it is under water. Every other category is healthy. "
+            notes="[4:15-5:00] Here is the concentration. Electronics is not a rounding error. "
+                  "It is half the company, and it is under water. Every other category is healthy. "
                   "Note the average discount is within a third of a point across all five "
                   "categories, so this is not a story about Electronics being discounted harder.",
         ),
@@ -339,18 +360,18 @@ def build_slides(f: dict) -> list[Slide]:
             figure="05_cost_structure",
             bullets=[
                 "Delivery, marketing and operating costs are near-identical across all five "
-                "categories. The gap is entirely in what the goods cost us relative to what we "
+                "categories. The gap sits entirely in what the goods cost us relative to what we "
                 "charge for them.",
             ],
-            notes="[5:00–5:45] This is the diagnostic slide. When merchandise costs 94 paise of "
+            notes="[5:00-5:45] This is the diagnostic slide. When merchandise costs 94 paise of "
                   "every rupee recognised, there is almost nothing left to cover delivery, "
-                  "marketing and operations — let alone a discount. That is why the same 13% "
+                  "marketing and operations, let alone a discount. That is why the same 13% "
                   "discount that a Fashion order absorbs comfortably puts an Electronics order "
                   "into loss.",
         ),
         Slide(
             kind="section", subtitle="Evidence", title="The lever we actually control",
-            notes="[5:45–5:55]",
+            notes="[5:45-5:55]",
         ),
         Slide(
             title="One discount policy is running two different businesses",
@@ -358,14 +379,14 @@ def build_slides(f: dict) -> list[Slide]:
                      "business still earns double digits at 25% off",
             figure="06_discount_tolerance",
             bullets=[
-                f"Flash Deals — average discount {f['flash_discount']:.0f}%, "
-                f"{f['flash_revenue_share']:.0f}% of revenue — are the only promotion type with a "
-                f"negative margin ({f['flash_margin']:+.1f}%). Un-promoted demand earns "
+                f"Flash Deals (average discount {f['flash_discount']:.0f}%, "
+                f"{f['flash_revenue_share']:.0f}% of revenue) are the only promotion type with a "
+                f"negative margin, at {f['flash_margin']:+.1f}%. Un-promoted demand earns "
                 f"{f['no_promo_margin']:.1f}%.",
             ],
-            notes="[5:55–6:50] This is the most actionable chart in the deck. Discount tolerance "
+            notes="[5:55-6:50] This is the most actionable chart in the deck. Discount tolerance "
                   "is a function of cost structure, and we have been setting it company-wide. "
-                  "Read this as tolerance, not as a response curve — deeply discounted orders "
+                  "Read this as tolerance, not as a response curve. Deeply discounted orders "
                   "also differ in what is in them, and I am not claiming the discount caused the "
                   "margin. But the policy implication survives either reading: the ceiling has to "
                   "be set per category.",
@@ -380,9 +401,9 @@ def build_slides(f: dict) -> list[Slide]:
                 f"subcategory by {f['top_driver_sd_pp']:.1f}. The regional debate in the "
                 f"leadership meeting is a debate about the wrong variable.",
             ],
-            notes="[6:50–7:30] The leadership team asked whether the answer is geography, "
-                  "customer type, channel or fulfilment. Measured properly — spread in margin, "
-                  "weighted by how much revenue each cut actually splits — it is none of those. "
+            notes="[6:50-7:30] The leadership team asked whether the answer is geography, "
+                  "customer type, channel or fulfilment. Measured properly, as spread in margin "
+                  "weighted by how much revenue each cut actually splits, it is none of those. "
                   "It is product. This is the slide that settles the argument in the room.",
         ),
         Slide(
@@ -391,30 +412,30 @@ def build_slides(f: dict) -> list[Slide]:
             figure="08_misleading_pair",
             bullets=[
                 f"Premium's pooled margin is {f['premium_margin_pooled']:.1f}%. Outside "
-                f"Electronics it is {f['premium_margin_ex_electronics']:.1f}% — ordinary. "
+                f"Electronics it is {f['premium_margin_ex_electronics']:.1f}%, which is ordinary. "
                 f"{f['premium_electronics_share']:.0f}% of Premium's revenue is Electronics.",
             ],
-            notes="[7:30–8:15] Exhibit A is accurate. Every number in it is correct, and it would "
+            notes="[7:30-8:15] Exhibit A is accurate. Every number in it is correct, and it would "
                   "have started a customer-segmentation project. Exhibit B is the same orders "
                   "split by what was in them, and Premium's margin is unremarkable. The segment "
                   "was never the problem; it just buys the category that is. Any cut of this data "
                   "that does not control for category will produce a version of this mistake.",
         ),
         Slide(
-            title="One thing is already working — and it is not where we were about to cut",
-            subtitle=f"On-time delivery went {f['on_time_before_contract']:.0f}% → "
+            title="One thing is already working, and it is not where we were about to cut",
+            subtitle=f"On-time delivery went from {f['on_time_before_contract']:.0f}% to "
                      f"{f['on_time_after_contract']:.0f}% after the January 2025 logistics "
-                     f"contract; complaints fell {f['complaint_before_contract']:.1f}% → "
+                     f"contract; complaints fell from {f['complaint_before_contract']:.1f}% to "
                      f"{f['complaint_after_contract']:.1f}%",
             figure="09_on_time_monthly",
             bullets=[
                 f"It cost about ₹{f['delivery_cost_after_contract'] - f['delivery_cost_before_contract']:.0f} "
                 f"more per order. The company-wide average of 43% hides both the step change and "
-                f"the festive collapse — peak on-time was still only "
-                f"{f['peak_on_time_last_year']:.0f}% last October–November.",
+                f"the festive collapse: peak on-time was still only "
+                f"{f['peak_on_time_last_year']:.0f}% last October and November.",
             ],
-            notes="[8:15–9:00] The COO's investment paid off, and the summary table we have all "
-                  "been reading hides it — 43% pooled across three years reads as a uniformly "
+            notes="[8:15-9:00] The COO's investment paid off, and the summary table we have all "
+                  "been reading hides it. Pooled across three years, 43% reads as a uniformly "
                   "broken function. The monthly series shows a genuine step change. It also shows "
                   "the one operational risk worth naming: every festive peak still breaks "
                   "delivery. That is a capacity issue, not a contract issue, and it is a watch "
@@ -422,7 +443,7 @@ def build_slides(f: dict) -> list[Slide]:
         ),
         Slide(
             kind="section", subtitle="Decision", title="Three actions, in priority order",
-            notes="[9:00–9:05]",
+            notes="[9:00-9:05]",
         ),
         Slide(
             kind="closing",
@@ -442,21 +463,21 @@ def build_slides(f: dict) -> list[Slide]:
                 "Set a category-aware discount ceiling; retire Flash Deals"
                 f"|Evidence: Electronics turns loss-making above 10% off while the rest of the "
                 f"business earns 10%+ at 25%; Flash Deals run at {f['flash_margin']:+.1f}%"
-                "|Benefit: enforceable in the pricing system next quarter — a rule, not a bet"
+                "|Benefit: enforceable in the pricing system next quarter. A rule, not a bet"
                 "|Risk: promotion is partly defensive; volume may move to competitors"
-                "|We would need: promotion incrementality — what these orders would have done "
-                "unpromoted",
+                "|We would need: promotion incrementality, meaning what these orders would have "
+                "done unpromoted",
 
                 "Underwrite acquisition on contribution, not revenue"
                 f"|Evidence: revenue per month +{f['accelerate_revenue_per_month_growth_pct']:.0f}% "
                 f"against profit per month +{f['accelerate_profit_per_month_growth_pct']:.0f}%; "
                 f"paid channels fell furthest and spend the most per rupee earned"
-                "|Benefit: protects growth while stopping the purchase of near-zero-contribution "
-                "revenue"
+                "|Benefit: protects growth while it stops us buying revenue that carries almost "
+                "no contribution"
                 "|Risk: paid channels may be seeding customers whose value appears later"
                 "|We would need: cohort retention and repeat value by acquisition channel",
             ],
-            notes="[9:05–9:45] Three, in order, and I would not start the second before the first. "
+            notes="[9:05-9:45] Three, in order, and I would not start the second before the first. "
                   "Notice what is not on this list: a regional strategy, a segmentation programme, "
                   "and cutting delivery investment. The evidence does not support any of them.",
         ),
@@ -465,7 +486,7 @@ def build_slides(f: dict) -> list[Slide]:
             subtitle="The limits are part of the recommendation",
             bullets=[
                 "Association, not causation. Late delivery correlates with lower ratings and "
-                "triples the complaint rate — that is not proof that lateness causes either.",
+                "triples the complaint rate. That is not proof that lateness causes either.",
                 "Returns are not netted out of net revenue, so a category's true contribution is "
                 "somewhat worse than shown, and worst where returns run highest.",
                 "The dataset has no SKU-level cost detail, so it can say Electronics is "
@@ -475,7 +496,7 @@ def build_slides(f: dict) -> list[Slide]:
                 "This is a synthetic case dataset. The method is what transfers, not the "
                 "specific rupee figures.",
             ],
-            notes="[9:45–10:00] I would rather you trust the three recommendations because you "
+            notes="[9:45-10:00] I would rather you trust the three recommendations because you "
                   "know what they rest on. Each of the four gaps above maps to something I would "
                   "ask for before we commit the money. Happy to take questions.",
         ),

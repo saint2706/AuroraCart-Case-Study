@@ -172,7 +172,7 @@ def fig_margin_decomposition(df) -> go.Figure:
         hovertemplate="<b>%{y:.2f}</b><br>%{x}<extra></extra>",
     ))
     fig.update_layout(
-        title=f"{d.rate_share_pct:.0f}% of the margin decline is erosion inside categories — "
+        title=f"{d.rate_share_pct:.0f}% of the margin decline is erosion inside categories, "
               "not a shift in what we sell",
         xaxis=dict(title=None, showgrid=False),
         yaxis=dict(title="Profit margin (%)", range=[0, d.base_margin * 1.35]),
@@ -318,8 +318,8 @@ def fig_misleading_pair(df) -> go.Figure:
 
     fig = make_subplots(
         rows=1, cols=2, horizontal_spacing=0.12,
-        subplot_titles=("Exhibit A — “Premium is our worst segment”",
-                        "Exhibit B — the same orders, split by what was in them"),
+        subplot_titles=('Exhibit A: "Premium is our worst segment"',
+                        "Exhibit B: the same orders, split by what was in them"),
     )
     fig.add_bar(x=segments, y=confound["Margin_Pooled"], name="Pooled margin",
                 marker=dict(color=INK["muted"], cornerradius=4),
@@ -339,7 +339,7 @@ def fig_misleading_pair(df) -> go.Figure:
 
     premium_share = confound.loc["Premium", "Electronics_Share_Pct"]
     fig.update_layout(
-        title="Same data, opposite conclusion — and only one of these is actionable",
+        title="Same data, opposite conclusion. Only one of these is actionable.",
         barmode="group", bargap=0.4, bargroupgap=0.1,
         legend=dict(orientation="h", yanchor="bottom", y=-0.22, x=0.52),
         showlegend=True,
@@ -351,7 +351,7 @@ def fig_misleading_pair(df) -> go.Figure:
     for annotation in fig.layout.annotations[:2]:
         annotation.font = dict(size=13, color=INK["secondary"])
     _note(fig, f"Premium's pooled margin is low because {premium_share:.0f}% of its revenue is "
-               "Electronics — the loss-making category — not because Premium customers are unprofitable.")
+               "Electronics, the loss-making category, not because Premium customers are unprofitable.")
     finalize(fig, HEIGHT)
     fig.update_layout(legend=dict(orientation="h", yanchor="top", y=-0.06, x=0.5, xanchor="center"),
                       margin=dict(t=110, b=140))
@@ -383,7 +383,7 @@ def fig_on_time_monthly(df) -> go.Figure:
                   annotation_font=dict(color=INK["secondary"], size=12))
     style_line(fig)
     fig.update_layout(
-        title="The delivery investment worked — and every festive peak still breaks it",
+        title="The delivery investment worked. Every festive peak still breaks it.",
         xaxis=dict(title=None, showgrid=False),
         yaxis=dict(title="On-time rate (%)", range=[0, 100]),
         showlegend=False,
@@ -410,7 +410,7 @@ def fig_channel_economics(df) -> go.Figure:
                     marker=dict(size=13, color=CATEGORICAL[1], line=dict(width=2, color=SURFACE)),
                     hovertemplate="<b>%{x:.1f}%</b> margin after<br>%{y}<extra></extra>")
     fig.update_layout(
-        title="Every channel lost margin — the paid ones lost the most and cost the most to run",
+        title="Every channel lost margin. The paid ones lost the most and cost the most to run.",
         xaxis=dict(title="Profit margin (%)", range=[0, channels["Margin_Before"].max() * 1.15]),
         yaxis=dict(title=None, showgrid=False),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),

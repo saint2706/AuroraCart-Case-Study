@@ -13,16 +13,18 @@
  */
 
 :root {
-  --surface-1: #fcfcfb;
-  --page-plane: #f9f9f7;
-  --text-primary: #0b0b0b;
-  --text-secondary: #52514e;
+  --surface-1: #1a1a19;
+  --surface-2: #242422;
+  --page-plane: #0d0d0d;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
   --text-muted: #898781;
-  --grid: #e1e0d9;
-  --axis: #c3c2b7;
-  --border: rgba(11, 11, 11, 0.10);
-  --accent: #2a78d6;
-  --focus-ring: rgba(42, 120, 214, 0.45);
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.10);
+  --accent: #3987e5;
+  --accent-2: #9085e9;
+  --focus-ring: rgba(57, 135, 229, 0.55);
 
   /* Set from JS (assets/environment.js); the fallback keeps CSS standalone. */
   --vh: 1vh;
@@ -31,11 +33,11 @@
   --radius: 12px;
   --tap-target: 44px;
 
-  /* The dashboard is a fixed light-surface design — the Plotly palette is
-     validated against this exact background. Declaring the scheme stops
-     Chrome for Android's auto-dark from re-rendering it into an unvalidated
-     inverted palette. */
-  color-scheme: light;
+  /* The dashboard is a fixed dark-surface design — the Plotly palette is
+     validated against this exact background. Declaring the scheme keeps
+     native form controls, scrollbars and the browser UI in dark to match,
+     and stops any auto-darkening from re-rendering an already-dark page. */
+  color-scheme: dark;
 }
 
 /* --------------------------------------------------------------------- base */
@@ -85,6 +87,20 @@ table {
   align-items: center;
   gap: 18px;
   margin-bottom: 20px;
+  position: relative;
+  padding-bottom: 14px;
+}
+
+/* The aurora hairline — the second and last appearance of the gradient. */
+.header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2) 45%, transparent 92%);
 }
 
 .brand-mark {
@@ -92,7 +108,9 @@ table {
   width: 52px;
   height: 52px;
   border-radius: 14px;
-  background: linear-gradient(135deg, #2a78d6, #4a3aa7);
+  /* The aurora: palette blue -> palette violet, the signature sweep. It appears
+     here and in the header's hairline rule, and nowhere else. */
+  background: linear-gradient(135deg, #3987e5, #9085e9);
   color: white;
   font-weight: 700;
   font-size: 20px;
@@ -133,7 +151,7 @@ table {
   border-radius: var(--radius);
   padding: 14px 16px 6px 16px;
   margin-bottom: 18px;
-  box-shadow: 0 1px 2px rgba(11, 11, 11, 0.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
 }
 
 .filter-label {
@@ -152,10 +170,17 @@ table {
 
 .reset-btn {
   border: 1px solid var(--border) !important;
+  background: var(--surface-2) !important;
   color: var(--text-secondary) !important;
   font-size: 13px !important;
   min-height: var(--tap-target);
   touch-action: manipulation;
+}
+
+.reset-btn:hover,
+.reset-btn:focus-visible {
+  color: var(--text-primary) !important;
+  border-color: var(--accent) !important;
 }
 
 /* The filter panel is collapsible on small screens only; the toggle is hidden
@@ -166,7 +191,7 @@ table {
   min-height: var(--tap-target);
   margin-bottom: 12px;
   border: 1px solid var(--border) !important;
-  background: var(--surface-1) !important;
+  background: var(--surface-2) !important;
   color: var(--text-secondary) !important;
   font-size: 14px !important;
   font-weight: 600;
@@ -262,13 +287,157 @@ table {
   padding-top: 14px;
 }
 
+/* ------------------------------------- dark overrides for shipped components */
+/* Dash's core components (tabs, dropdowns, the date picker) and Bootstrap's
+   alerts ship their own light styles; everything below re-tokens them. The
+   page's own components never need this section — they read the tokens
+   directly. */
+
+.app-tabs .tab {
+  background: var(--page-plane) !important;
+  border-color: var(--grid) !important;
+  color: var(--text-secondary) !important;
+}
+
+.app-tabs .tab--selected {
+  background: var(--surface-1) !important;
+  border-top: 2px solid var(--accent) !important;
+  color: var(--text-primary) !important;
+  font-weight: 600;
+}
+
+.dash-dropdown-trigger,
+.dash-datepicker-input-wrapper,
+.dash-datepicker input {
+  background: var(--surface-2) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+/* The dropdown menu is portalled to the end of <body>, outside `.dash-dropdown`,
+   so its search box and action buttons have to be targeted by their own classes
+   rather than as descendants of the control. Both ship hard-coded dark-on-light
+   colors. */
+.dash-dropdown input,
+.dash-datepicker input,
+.dash-dropdown-content input,
+.dash-dropdown-options input {
+  color: var(--text-primary) !important;
+  background: transparent !important;
+}
+
+.dash-dropdown-action-button {
+  color: var(--accent) !important;
+}
+
+.dash-dropdown-action-button:hover,
+.dash-dropdown-action-button:focus-visible {
+  color: var(--text-primary) !important;
+}
+
+/* Dash renders the dropdown's placeholder as a <span>, not a real input
+   placeholder, and hard-codes it to a dark navy at 60% alpha — invisible on a
+   dark surface. The span selector is the one that actually applies; the
+   ::placeholder rule covers the date picker's genuine <input>s. */
+.dash-dropdown-placeholder,
+.dash-dropdown ::placeholder,
+.dash-datepicker ::placeholder {
+  color: var(--text-muted) !important;
+  opacity: 1;
+}
+
+/* The floating menus: elevated surface, hairline ring, dark option rows. */
+.dash-dropdown-content,
+.dash-dropdown-options,
+.dash-datepicker-portal,
+.dash-datepicker-calendar-wrapper,
+.dash-datepicker-fullscreen {
+  background: var(--surface-2) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.dash-dropdown-option {
+  background: transparent !important;
+  color: var(--text-secondary) !important;
+}
+
+.dash-dropdown-option:hover,
+.dash-dropdown-option[aria-selected="true"],
+.dash-dropdown-option.is-focused {
+  background: rgba(57, 135, 229, 0.18) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Multi-select value chips inside the trigger. */
+.dash-dropdown-trigger [class*="chip"],
+.dash-dropdown-trigger [class*="tag"] {
+  background: rgba(57, 135, 229, 0.22) !important;
+  color: var(--text-primary) !important;
+  border-color: transparent !important;
+}
+
+/* The calendar's own containers ship a white background that shows as a light
+   ring around the (already re-tokened) wrapper. */
+.dash-datepicker,
+.dash-datepicker-content,
+.dash-input-container,
+.dash-input-stepper {
+  background: var(--surface-2) !important;
+}
+
+.dash-datepicker-content {
+  border-color: var(--border) !important;
+}
+
+.dash-datepicker-portal *,
+.dash-datepicker-calendar-wrapper * {
+  border-color: var(--grid);
+}
+
+/* Month captions, weekday headers, nav arrows and out-of-month padding cells
+   all ship a near-black navy that disappears on the dark surface. */
+.dash-datepicker-calendar-month-header,
+.dash-datepicker-calendar-padding,
+.dash-datepicker-month-nav,
+.dash-datepicker-month-nav svg,
+.dash-datepicker button {
+  color: var(--text-secondary) !important;
+}
+
+.dash-datepicker-month-nav:hover {
+  color: var(--text-primary) !important;
+}
+
+/* Dash's own accent is a purple (#7f4bc4) that belongs to no slot in this
+   palette; the selected and hovered days take the validated blue instead. */
+.dash-datepicker-calendar-date-selected,
+td.dash-datepicker-calendar-date-selected {
+  background: var(--accent) !important;
+  color: #ffffff !important;
+}
+
+.dash-datepicker-calendar-date-highlighted:not(.dash-datepicker-calendar-date-selected) {
+  background: rgba(57, 135, 229, 0.18) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Bootstrap alert used for the empty state; the story callouts already
+   re-token themselves with !important rules below. */
+.alert-warning {
+  background: rgba(250, 178, 25, 0.12) !important;
+  border-color: rgba(250, 178, 25, 0.4) !important;
+  color: #fab219 !important;
+}
+
 /* -------------------------------------------------------------- stat cards */
 
 .stat-card {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface-1);
-  box-shadow: 0 1px 2px rgba(11, 11, 11, 0.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
   height: 100%;
 }
 
